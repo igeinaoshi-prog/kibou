@@ -1,6 +1,6 @@
 // 従業員用・管理者用ページの両方で使う共通処理
 
-import { firebaseConfig } from "../firebase-config.js";
+import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
   getFirestore,
