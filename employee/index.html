@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="vi">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>希望休申請 - 従業員用</title>
+<title>Đăng ký ngày nghỉ mong muốn - Dành cho nhân viên</title>
 <style>
   :root {
     --bg:#f7f7f8; --card-bg:#ffffff; --text:#1f2328; --text-muted:#6b7280;
@@ -28,16 +28,16 @@
   button { padding:8px 14px; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; background:var(--accent); color:var(--accent-text); }
   button.ghost { background:transparent; color:var(--text); border:1px solid var(--border); }
   .month-nav { display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:14px; }
-  .month-nav .label { font-size:16px; font-weight:700; min-width:110px; text-align:center; }
+  .month-nav .label { font-size:16px; font-weight:700; min-width:150px; text-align:center; }
   .month-nav button { padding:6px 12px; }
   .day-list { display:flex; flex-direction:column; gap:6px; max-height:480px; overflow-y:auto; padding-right:2px; }
   .day-row { display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--bg); }
-  .day-row .date-label { width:74px; font-weight:600; font-size:14px; flex-shrink:0; }
+  .day-row .date-label { width:100px; font-weight:600; font-size:14px; flex-shrink:0; }
   .day-row .date-label.sat { color:#3b82f6; }
   .day-row .date-label.sun { color:#ef4444; }
   .day-row .count-label { flex:1; font-size:12px; color:var(--text-muted); }
   .day-row .count-label.full { color:var(--full-text); font-weight:700; }
-  .day-row select.day-select { min-width:130px; }
+  .day-row select.day-select { min-width:150px; }
   .day-row.selected { border-color:var(--off-bg); }
   .legend { font-size:12px; color:var(--text-muted); margin-top:10px; }
   .submit-row { margin-top:14px; display:flex; justify-content:flex-end; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -47,32 +47,39 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>📅 希望休申請</h1>
+  <h1>📅 Đăng ký ngày nghỉ mong muốn</h1>
 
-  <div class="card">
-    <h2>お名前を選択</h2>
+  <div class="card" id="nameSelectCard">
+    <h2>Chọn tên của bạn</h2>
     <div class="row">
       <select id="empSelect" onchange="onEmployeeSelected()">
-        <option value="">選択してください</option>
+        <option value="">Vui lòng chọn</option>
       </select>
     </div>
     <div class="status-msg" id="empListStatus" style="margin-top:8px;"></div>
   </div>
+  <div class="card" id="nameFixedCard" style="display:none;">
+    <h2>Tên của bạn</h2>
+    <div class="row" style="justify-content:space-between;">
+      <div style="font-size:16px; font-weight:700;" id="fixedNameLabel"></div>
+    </div>
+    <div class="status-msg" id="fixedNameStatus" style="margin-top:8px;"></div>
+  </div>
 
   <div class="card">
     <div class="month-nav">
-      <button class="ghost" onclick="changeMonth(-1)">◀ 前月</button>
+      <button class="ghost" onclick="changeMonth(-1)">◀ Tháng trước</button>
       <div class="label" id="monthLabel"></div>
-      <button class="ghost" onclick="changeMonth(1)">次月 ▶</button>
+      <button class="ghost" onclick="changeMonth(1)">Tháng sau ▶</button>
     </div>
-    <div class="empty-state" id="monthClosedMsg" style="display:none;">この月の希望休受付は現在停止しています</div>
-    <div class="status-msg" id="alreadySubmittedMsg" style="display:none; margin-bottom:10px;">この月はすでに送信済みです。希望休は1回のみ送信できます（変更が必要な場合は管理者にご連絡ください）。</div>
+    <div class="empty-state" id="monthClosedMsg" style="display:none;">Hiện tại tháng này chưa mở đăng ký ngày nghỉ</div>
+    <div class="status-msg" id="alreadySubmittedMsg" style="display:none; margin-bottom:10px;">Bạn đã gửi đăng ký cho tháng này rồi. Mỗi tháng chỉ được gửi 1 lần (nếu cần thay đổi, vui lòng liên hệ quản lý).</div>
     <div class="status-msg" id="selectionSummary" style="margin-bottom:8px; font-weight:600;"></div>
     <div class="day-list" id="dayListContainer"></div>
-    <div class="legend" id="dayListLegend">各日にちのプルダウンから「×(休み希望)」を選んでください。1か月に選べるのは最大6日までです。上限に達した日は選択できません。送信は月ごとに1回のみです。</div>
+    <div class="legend" id="dayListLegend">Hãy chọn "×(Muốn nghỉ)" trong danh sách thả xuống của từng ngày. Mỗi tháng chỉ được chọn tối đa 6 ngày. Những ngày đã đủ số lượng sẽ không thể chọn. Mỗi tháng chỉ được gửi đăng ký 1 lần.</div>
     <div class="submit-row" id="submitRow">
       <span class="status-msg" id="submitStatus"></span>
-      <button id="submitBtn" onclick="submitRequest()">この内容で送信</button>
+      <button id="submitBtn" onclick="submitRequest()">Gửi đăng ký</button>
     </div>
   </div>
 </div>
@@ -80,8 +87,20 @@
 <script type="module">
 import {
   db, doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs,
-  WEEKDAYS, monthKey, monthLabelText, daysInMonthOf
+  monthKey, daysInMonthOf
 } from "../common.js";
+
+// 月表示はベトナム語形式にする(管理者ページ側の日本語表記には影響させない)
+const MONTH_NAMES_VN = [
+  "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",
+  "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
+];
+function monthLabelText(d) {
+  return MONTH_NAMES_VN[d.getMonth()] + " năm " + d.getFullYear();
+}
+
+// Chữ viết tắt các thứ trong tuần bằng tiếng Việt (Chủ Nhật, Thứ Hai, ...)
+const WEEKDAYS_VN = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
 let employees = [];
 let selectedEmployee = "";
@@ -95,6 +114,10 @@ let empCapacityLimits = {};
 let closedMonths = new Set();
 let hasSubmittedThisMonth = false;
 const MAX_OFF_DAYS = 6;
+
+const urlParams = new URLSearchParams(window.location.search);
+const nameFromUrl = urlParams.get('name');
+let nameLocked = false;
 
 function renderEmployeeDayList() {
   const ym = monthKey(currentDate);
@@ -123,7 +146,7 @@ function renderEmployeeDayList() {
   submitBtn.disabled = hasSubmittedThisMonth;
   submitBtn.style.opacity = hasSubmittedThisMonth ? '0.5' : '1';
   submitBtn.style.cursor = hasSubmittedThisMonth ? 'not-allowed' : 'pointer';
-  summary.textContent = `選択中: ${offDaysSet.size}/${MAX_OFF_DAYS}日`;
+  summary.textContent = `Đã chọn: ${offDaysSet.size}/${MAX_OFF_DAYS} ngày`;
   summary.style.color = offDaysSet.size >= MAX_OFF_DAYS ? 'var(--full-text)' : 'var(--text-muted)';
 
   container.innerHTML = "";
@@ -147,26 +170,26 @@ function renderEmployeeDayList() {
 
     const dateLabel = document.createElement('div');
     dateLabel.className = 'date-label' + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : '');
-    dateLabel.textContent = day + '日(' + WEEKDAYS[dow] + ')';
+    dateLabel.textContent = 'Ngày ' + day + ' (' + WEEKDAYS_VN[dow] + ')';
     row.appendChild(dateLabel);
 
     const countLabel = document.createElement('div');
     countLabel.className = 'count-label' + (isFull ? ' full' : '');
     countLabel.textContent = hasLimit
-      ? `希望者 ${otherCount + (isSelected ? 1 : 0)}/${limit}人`
-      : `希望者 ${otherCount + (isSelected ? 1 : 0)}人`;
+      ? `${otherCount + (isSelected ? 1 : 0)}/${limit} người muốn nghỉ`
+      : `${otherCount + (isSelected ? 1 : 0)} người muốn nghỉ`;
     row.appendChild(countLabel);
 
     const select = document.createElement('select');
     select.className = 'day-select';
     const optWork = document.createElement('option');
     optWork.value = "";
-    optWork.textContent = "（勤務）";
+    optWork.textContent = "(Đi làm)";
     const optOff = document.createElement('option');
     optOff.value = "off";
-    if (isFull && !isSelected) optOff.textContent = "×（満員）";
-    else if (blockedByPersonalLimit) optOff.textContent = "×（上限6日）";
-    else optOff.textContent = "×（休み希望）";
+    if (isFull && !isSelected) optOff.textContent = "× (Đã đủ số lượng)";
+    else if (blockedByPersonalLimit) optOff.textContent = "× (Đã đủ 6 ngày)";
+    else optOff.textContent = "× (Muốn nghỉ)";
     optOff.disabled = (isFull && !isSelected) || blockedByPersonalLimit;
     select.appendChild(optWork);
     select.appendChild(optOff);
@@ -257,14 +280,14 @@ function subscribeMonthVisibility() {
 
 async function submitRequest() {
   if (!selectedEmployee) {
-    document.getElementById('submitStatus').textContent = "先にお名前を選択してください";
+    document.getElementById('submitStatus').textContent = "Vui lòng chọn tên trước";
     return;
   }
   if (hasSubmittedThisMonth) {
-    document.getElementById('submitStatus').textContent = "この月はすでに送信済みです。希望休は1回のみ送信できます。";
+    document.getElementById('submitStatus').textContent = "Bạn đã gửi đăng ký cho tháng này rồi. Mỗi tháng chỉ được gửi 1 lần.";
     return;
   }
-  document.getElementById('submitStatus').textContent = "送信中...";
+  document.getElementById('submitStatus').textContent = "Đang gửi...";
   const ym = monthKey(currentDate);
   const ownDocRef = doc(db, "requests", selectedEmployee + "__" + ym);
   try {
@@ -273,7 +296,7 @@ async function submitRequest() {
       hasSubmittedThisMonth = true;
       savedOffDays = new Set(ownSnap.data().offDays || []);
       offDaysSet = new Set(savedOffDays);
-      document.getElementById('submitStatus').textContent = "この月はすでに送信済みです。希望休は1回のみ送信できます。";
+      document.getElementById('submitStatus').textContent = "Bạn đã gửi đăng ký cho tháng này rồi. Mỗi tháng chỉ được gửi 1 lần.";
       renderEmployeeDayList();
       return;
     }
@@ -310,12 +333,12 @@ async function submitRequest() {
     hasSubmittedThisMonth = true;
 
     document.getElementById('submitStatus').textContent = removed.length > 0
-      ? `送信しました（${removed.join('、')}日は上限に達したため解除されました）`
-      : "送信しました ✓";
+      ? `Đã gửi (Các ngày ${removed.join(', ')} đã đủ số lượng nên bị hủy chọn)`
+      : "Đã gửi thành công ✓";
     renderEmployeeDayList();
   } catch (e) {
     console.error(e);
-    document.getElementById('submitStatus').textContent = "送信に失敗しました";
+    document.getElementById('submitStatus').textContent = "Gửi thất bại";
   }
 }
 window.submitRequest = submitRequest;
@@ -323,7 +346,7 @@ window.submitRequest = submitRequest;
 function renderEmployeeSelect() {
   const sel = document.getElementById('empSelect');
   const prev = sel.value;
-  sel.innerHTML = '<option value="">選択してください</option>';
+  sel.innerHTML = '<option value="">Vui lòng chọn</option>';
   employees.forEach(name => {
     const opt = document.createElement('option');
     opt.value = name;
@@ -332,13 +355,41 @@ function renderEmployeeSelect() {
   });
   if (employees.includes(prev)) sel.value = prev;
   document.getElementById('empListStatus').textContent = employees.length === 0
-    ? "従業員リストが空です。管理者に従業員登録を依頼してください。" : "";
+    ? "Danh sách nhân viên đang trống. Vui lòng liên hệ quản lý để được đăng ký." : "";
+}
+
+function applyNameFromUrl() {
+  if (!nameFromUrl) return;
+  const nameSelectCard = document.getElementById('nameSelectCard');
+  const nameFixedCard = document.getElementById('nameFixedCard');
+  const fixedNameLabel = document.getElementById('fixedNameLabel');
+  const fixedNameStatus = document.getElementById('fixedNameStatus');
+
+  if (employees.includes(nameFromUrl)) {
+    nameLocked = true;
+    selectedEmployee = nameFromUrl;
+    nameSelectCard.style.display = 'none';
+    nameFixedCard.style.display = '';
+    fixedNameLabel.textContent = nameFromUrl;
+    fixedNameStatus.textContent = "";
+    applySelfFromCache();
+    renderEmployeeDayList();
+  } else if (employees.length > 0) {
+    // Danh sách nhân viên đã tải nhưng không tìm thấy tên tương ứng
+    nameLocked = false;
+    nameSelectCard.style.display = '';
+    nameFixedCard.style.display = 'none';
+    document.getElementById('empListStatus').textContent =
+      `Không tìm thấy tên "${nameFromUrl}" trong liên kết. Vui lòng chọn tên bên dưới.`;
+  }
+  // Nếu danh sách nhân viên chưa tải xong thì không làm gì, sẽ tự gọi lại sau khi tải xong.
 }
 
 function subscribeEmployeeList() {
   onSnapshot(doc(db, "employees", "list"), snap => {
     employees = snap.exists() ? (snap.data().names || []) : [];
     renderEmployeeSelect();
+    applyNameFromUrl();
   }, err => console.error(err));
 }
 

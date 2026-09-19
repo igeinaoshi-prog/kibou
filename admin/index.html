@@ -43,10 +43,14 @@
   tr.quota-row td, tr.usage-row td { background:var(--hover-bg); }
   .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .emp-manage-list { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
-  .emp-manage-item { display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:var(--bg); border-radius:8px; border:1px solid var(--border); }
+  .emp-manage-item { display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:var(--bg); border-radius:8px; border:1px solid var(--border); gap:8px; flex-wrap:wrap; }
+  .emp-manage-item .emp-name-text { font-weight:600; flex:1; min-width:80px; }
+  .emp-manage-item .emp-actions { display:flex; gap:6px; flex-wrap:wrap; }
+  button.link-copy { background:transparent; color:var(--accent); border:1px solid var(--accent); padding:4px 8px; font-size:12px; }
   .empty-state { text-align:center; color:var(--text-muted); font-size:13px; padding:20px 0; }
   .hint { font-size:12px; color:var(--text-muted); margin-top:6px; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -67,7 +71,7 @@
     <div class="hint">「上限設定」の行に、その日に許可する希望休の人数を入力してください（空欄=上限なし）。「現在の希望者数」が上限に達すると赤く表示され、従業員側では選択できなくなります。</div>
     <div id="adminEmpty" class="empty-state" style="display:none;"></div>
     <div class="row" style="margin-top:12px; justify-content:flex-end;">
-      <button class="ghost" onclick="exportCsv()">CSVをダウンロード</button>
+      <button class="ghost" onclick="exportExcel()">📊 Excelをダウンロード</button>
     </div>
   </div>
 
@@ -78,6 +82,7 @@
       <button onclick="addEmployee()">追加</button>
     </div>
     <div class="emp-manage-list" id="empManageList"></div>
+    <div class="hint">「リンクをコピー」で、その従業員専用のURL(名前入り)をコピーできます。従業員はそのリンクを開くだけで、名前選択なしに自分のカレンダーが表示されます。</div>
   </div>
 </div>
 
@@ -215,6 +220,27 @@ function renderAdminTable() {
   table.innerHTML = html;
 }
 
+function employeeLinkFor(name) {
+  // 管理者ページ(admin/)と同じ階層にある employee/ を指す絶対URLを組み立てる
+  const employeeBase = new URL("../employee/", window.location.href);
+  employeeBase.searchParams.set("name", name);
+  return employeeBase.toString();
+}
+
+async function copyEmployeeLink(name, btn) {
+  const link = employeeLinkFor(name);
+  const original = btn.textContent;
+  try {
+    await navigator.clipboard.writeText(link);
+    btn.textContent = "コピーしました ✓";
+  } catch (e) {
+    // clipboard APIが使えない場合は、リンクをprompt表示してコピーしてもらう
+    window.prompt("このリンクをコピーしてください:", link);
+  }
+  setTimeout(() => { btn.textContent = original; }, 1500);
+}
+window.copyEmployeeLink = copyEmployeeLink;
+
 function renderEmpManageList() {
   const list = document.getElementById('empManageList');
   list.innerHTML = "";
@@ -225,14 +251,28 @@ function renderEmpManageList() {
   employees.forEach(name => {
     const item = document.createElement('div');
     item.className = 'emp-manage-item';
+
     const span = document.createElement('span');
+    span.className = 'emp-name-text';
     span.textContent = name;
-    const btn = document.createElement('button');
-    btn.className = 'danger';
-    btn.textContent = '削除';
-    btn.onclick = () => removeEmployee(name);
     item.appendChild(span);
-    item.appendChild(btn);
+
+    const actions = document.createElement('div');
+    actions.className = 'emp-actions';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'link-copy';
+    copyBtn.textContent = 'リンクをコピー';
+    copyBtn.onclick = () => copyEmployeeLink(name, copyBtn);
+    actions.appendChild(copyBtn);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'danger';
+    delBtn.textContent = '削除';
+    delBtn.onclick = () => removeEmployee(name);
+    actions.appendChild(delBtn);
+
+    item.appendChild(actions);
     list.appendChild(item);
   });
 }
@@ -265,29 +305,54 @@ function subscribeEmployeeList() {
   }, err => console.error(err));
 }
 
-async function exportCsv() {
+function exportExcel() {
+  if (typeof XLSX === 'undefined') {
+    alert("Excel出力用のライブラリの読み込みに失敗しました。通信環境を確認し、ページを再読み込みしてから、もう一度お試しください。");
+    return;
+  }
   const ym = monthKey(adminDate);
   const map = adminRequestsCache[ym] || {};
   const daysInMonth = daysInMonthOf(adminDate);
-  let rows = ["氏名," + Array.from({ length: daysInMonth }, (_, i) => i + 1).join(",")];
+
+  const dayCounts = {};
+  Object.values(map).forEach(days => (days || []).forEach(d => { dayCounts[d] = (dayCounts[d] || 0) + 1; }));
+
+  const dayHeaders = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const rows = [];
+
+  // ヘッダー行
+  rows.push(["氏名", ...dayHeaders]);
+
+  // 上限設定行
+  rows.push(["上限設定", ...dayHeaders.map(d => {
+    const val = adminCapacityLimits[String(d)];
+    return (val !== undefined && val !== null && val !== "") ? Number(val) : "";
+  })]);
+
+  // 現在の希望者数行
+  rows.push(["現在の希望者数", ...dayHeaders.map(d => dayCounts[d] || 0)]);
+
+  // 従業員ごとの行(×は文字列、それ以外は空欄)
   employees.forEach(name => {
     const days = new Set(map[name] || []);
-    const row = [name];
-    for (let d = 1; d <= daysInMonth; d++) row.push(days.has(d) ? "×" : "");
-    rows.push(row.join(","));
+    rows.push([name, ...dayHeaders.map(d => (days.has(d) ? "×" : ""))]);
   });
-  const csv = "\uFEFF" + rows.join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `希望休_${ym}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // 列幅の調整(氏名列は広め、日付列は狭め)
+  ws['!cols'] = [{ wch: 14 }, ...dayHeaders.map(() => ({ wch: 4 }))];
+
+  // 上部3行(ヘッダー・上限設定・希望者数)を常に表示したままスクロールできるようにする
+  ws['!freeze'] = { xSplit: 1, ySplit: 3 };
+  ws['!panes'] = [{ xSplit: 1, ySplit: 3, topLeftCell: "B4", activePane: "bottomRight", state: "frozen" }];
+
+  const wb = XLSX.utils.book_new();
+  const sheetName = monthLabelText(adminDate).replace(/[\\/?*[\]:]/g, "");
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, `希望休_${ym}.xlsx`);
 }
-window.exportCsv = exportCsv;
+window.exportExcel = exportExcel;
 
 function init() {
   document.getElementById('adminMonthLabel').textContent = monthLabelText(adminDate);
