@@ -4,6 +4,5 @@ export const firebaseConfig = {
   projectId: "hgvrequest",
   storageBucket: "hgvrequest.firebasestorage.app",
   messagingSenderId: "382442573607",
-  appId: "1:382442573607:web:96d3303b01e3fce996e302D"
+  appId: "1:382442573607:web:96d3303b01e3fce996e302"
 };
-const analytics = getAnalytics(app);
