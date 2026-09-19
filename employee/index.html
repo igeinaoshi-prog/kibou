@@ -24,7 +24,7 @@
   .card { background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:18px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
   .card h2 { font-size:15px; margin:0 0 12px; color:var(--text-muted); font-weight:600; }
   .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  select, input[type=text] { padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:14px; flex:1; min-width:120px; }
+  select { padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:14px; flex:1; min-width:120px; }
   button { padding:8px 14px; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; background:var(--accent); color:var(--accent-text); }
   button.ghost { background:transparent; color:var(--text); border:1px solid var(--border); }
   .month-nav { display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:14px; }
@@ -43,43 +43,40 @@
   .submit-row { margin-top:14px; display:flex; justify-content:flex-end; gap:8px; align-items:center; flex-wrap:wrap; }
   .status-msg { font-size:13px; color:var(--text-muted); }
   .empty-state { text-align:center; color:var(--text-muted); font-size:13px; padding:20px 0; }
+  .error-state { text-align:center; color:var(--full-text); font-size:14px; padding:24px 12px; font-weight:600; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>📅 Đăng ký ngày nghỉ mong muốn</h1>
 
-  <div class="card" id="nameSelectCard">
-    <h2>Chọn tên của bạn</h2>
-    <div class="row">
-      <select id="empSelect" onchange="onEmployeeSelected()">
-        <option value="">Vui lòng chọn</option>
-      </select>
-    </div>
-    <div class="status-msg" id="empListStatus" style="margin-top:8px;"></div>
-  </div>
-  <div class="card" id="nameFixedCard" style="display:none;">
-    <h2>Tên của bạn</h2>
-    <div class="row" style="justify-content:space-between;">
-      <div style="font-size:16px; font-weight:700;" id="fixedNameLabel"></div>
-    </div>
-    <div class="status-msg" id="fixedNameStatus" style="margin-top:8px;"></div>
+  <div class="card" id="noNameCard" style="display:none;">
+    <div class="error-state" id="noNameMsg"></div>
   </div>
 
-  <div class="card">
-    <div class="month-nav">
-      <button class="ghost" onclick="changeMonth(-1)">◀ Tháng trước</button>
-      <div class="label" id="monthLabel"></div>
-      <button class="ghost" onclick="changeMonth(1)">Tháng sau ▶</button>
+  <div id="mainContent" style="display:none;">
+    <div class="card">
+      <h2>Tên của bạn</h2>
+      <div class="row" style="justify-content:space-between;">
+        <div style="font-size:16px; font-weight:700;" id="fixedNameLabel"></div>
+      </div>
     </div>
-    <div class="empty-state" id="monthClosedMsg" style="display:none;">Hiện tại tháng này chưa mở đăng ký ngày nghỉ</div>
-    <div class="status-msg" id="alreadySubmittedMsg" style="display:none; margin-bottom:10px;">Bạn đã gửi đăng ký cho tháng này rồi. Mỗi tháng chỉ được gửi 1 lần (nếu cần thay đổi, vui lòng liên hệ quản lý).</div>
-    <div class="status-msg" id="selectionSummary" style="margin-bottom:8px; font-weight:600;"></div>
-    <div class="day-list" id="dayListContainer"></div>
-    <div class="legend" id="dayListLegend">Hãy chọn "×(Muốn nghỉ)" trong danh sách thả xuống của từng ngày. Mỗi tháng chỉ được chọn tối đa 6 ngày. Những ngày đã đủ số lượng sẽ không thể chọn. Mỗi tháng chỉ được gửi đăng ký 1 lần.</div>
-    <div class="submit-row" id="submitRow">
-      <span class="status-msg" id="submitStatus"></span>
-      <button id="submitBtn" onclick="submitRequest()">Gửi đăng ký</button>
+
+    <div class="card">
+      <div class="month-nav">
+        <button class="ghost" onclick="changeMonth(-1)">◀ Tháng trước</button>
+        <div class="label" id="monthLabel"></div>
+        <button class="ghost" onclick="changeMonth(1)">Tháng sau ▶</button>
+      </div>
+      <div class="empty-state" id="monthClosedMsg" style="display:none;">Hiện tại tháng này chưa mở đăng ký ngày nghỉ</div>
+      <div class="status-msg" id="alreadySubmittedMsg" style="display:none; margin-bottom:10px;">Bạn đã gửi đăng ký cho tháng này rồi. Mỗi tháng chỉ được gửi 1 lần (nếu cần thay đổi, vui lòng liên hệ quản lý).</div>
+      <div class="status-msg" id="selectionSummary" style="margin-bottom:8px; font-weight:600;"></div>
+      <div class="day-list" id="dayListContainer"></div>
+      <div class="legend" id="dayListLegend">Hãy chọn "×(Muốn nghỉ)" trong danh sách thả xuống của từng ngày. Mỗi tháng chỉ được chọn tối đa 6 ngày. Những ngày đã đủ số lượng sẽ không thể chọn. Mỗi tháng chỉ được gửi đăng ký 1 lần.</div>
+      <div class="submit-row" id="submitRow">
+        <span class="status-msg" id="submitStatus"></span>
+        <button id="submitBtn" onclick="submitRequest()">Gửi đăng ký</button>
+      </div>
     </div>
   </div>
 </div>
@@ -115,9 +112,15 @@ let closedMonths = new Set();
 let hasSubmittedThisMonth = false;
 const MAX_OFF_DAYS = 6;
 
+// 名前選択のプルダウンは廃止。URLの ?name=氏名 だけでアクセスする運用にする。
 const urlParams = new URLSearchParams(window.location.search);
 const nameFromUrl = urlParams.get('name');
-let nameLocked = false;
+
+function showNoNameError(message) {
+  document.getElementById('noNameCard').style.display = '';
+  document.getElementById('noNameMsg').textContent = message;
+  document.getElementById('mainContent').style.display = 'none';
+}
 
 function renderEmployeeDayList() {
   const ym = monthKey(currentDate);
@@ -222,14 +225,6 @@ function changeMonth(delta) {
 }
 window.changeMonth = changeMonth;
 
-function onEmployeeSelected() {
-  selectedEmployee = document.getElementById('empSelect').value;
-  document.getElementById('submitStatus').textContent = "";
-  applySelfFromCache();
-  renderEmployeeDayList();
-}
-window.onEmployeeSelected = onEmployeeSelected;
-
 function applySelfFromCache() {
   let selfDays = [];
   let found = false;
@@ -279,10 +274,7 @@ function subscribeMonthVisibility() {
 }
 
 async function submitRequest() {
-  if (!selectedEmployee) {
-    document.getElementById('submitStatus').textContent = "Vui lòng chọn tên trước";
-    return;
-  }
+  if (!selectedEmployee) return;
   if (hasSubmittedThisMonth) {
     document.getElementById('submitStatus').textContent = "Bạn đã gửi đăng ký cho tháng này rồi. Mỗi tháng chỉ được gửi 1 lần.";
     return;
@@ -343,59 +335,34 @@ async function submitRequest() {
 }
 window.submitRequest = submitRequest;
 
-function renderEmployeeSelect() {
-  const sel = document.getElementById('empSelect');
-  const prev = sel.value;
-  sel.innerHTML = '<option value="">Vui lòng chọn</option>';
-  employees.forEach(name => {
-    const opt = document.createElement('option');
-    opt.value = name;
-    opt.textContent = name;
-    sel.appendChild(opt);
-  });
-  if (employees.includes(prev)) sel.value = prev;
-  document.getElementById('empListStatus').textContent = employees.length === 0
-    ? "Danh sách nhân viên đang trống. Vui lòng liên hệ quản lý để được đăng ký." : "";
-}
-
 function applyNameFromUrl() {
-  if (!nameFromUrl) return;
-  const nameSelectCard = document.getElementById('nameSelectCard');
-  const nameFixedCard = document.getElementById('nameFixedCard');
-  const fixedNameLabel = document.getElementById('fixedNameLabel');
-  const fixedNameStatus = document.getElementById('fixedNameStatus');
-
+  if (!nameFromUrl) {
+    showNoNameError("Không tìm thấy tên trong liên kết. Vui lòng dùng đúng liên kết mà quản lý đã gửi cho bạn.");
+    return;
+  }
   if (employees.includes(nameFromUrl)) {
-    nameLocked = true;
     selectedEmployee = nameFromUrl;
-    nameSelectCard.style.display = 'none';
-    nameFixedCard.style.display = '';
-    fixedNameLabel.textContent = nameFromUrl;
-    fixedNameStatus.textContent = "";
+    document.getElementById('noNameCard').style.display = 'none';
+    document.getElementById('mainContent').style.display = '';
+    document.getElementById('fixedNameLabel').textContent = nameFromUrl;
     applySelfFromCache();
     renderEmployeeDayList();
   } else if (employees.length > 0) {
-    // Danh sách nhân viên đã tải nhưng không tìm thấy tên tương ứng
-    nameLocked = false;
-    nameSelectCard.style.display = '';
-    nameFixedCard.style.display = 'none';
-    document.getElementById('empListStatus').textContent =
-      `Không tìm thấy tên "${nameFromUrl}" trong liên kết. Vui lòng chọn tên bên dưới.`;
+    // 従業員リストは読み込まれたが該当する名前が見つからない
+    showNoNameError(`Không tìm thấy tên "${nameFromUrl}". Vui lòng liên hệ quản lý để được cấp lại liên kết.`);
   }
-  // Nếu danh sách nhân viên chưa tải xong thì không làm gì, sẽ tự gọi lại sau khi tải xong.
+  // employees がまだ空(読み込み中)の場合は何もしない。読み込み後に再度呼ばれる。
 }
 
 function subscribeEmployeeList() {
   onSnapshot(doc(db, "employees", "list"), snap => {
     employees = snap.exists() ? (snap.data().names || []) : [];
-    renderEmployeeSelect();
     applyNameFromUrl();
   }, err => console.error(err));
 }
 
 async function init() {
   document.getElementById('monthLabel').textContent = monthLabelText(currentDate);
-  renderEmployeeDayList();
   subscribeEmployeeList();
   subscribeEmployeeMonth();
   subscribeEmployeeCapacity();
