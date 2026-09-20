@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>希望休申請 - 従業員用(日本語)</title>
+<style>
+  :root {
+    --bg:#f7f7f8; --card-bg:#ffffff; --text:#1f2328; --text-muted:#6b7280;
+    --border:#e2e4e8; --accent:#4f6bed; --accent-text:#ffffff; --off-bg:#ef4444;
+    --off-text:#ffffff; --hover-bg:#f0f1f4; --full-text:#b42318;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#17181c; --card-bg:#212227; --text:#eceef1; --text-muted:#9aa0aa;
+      --border:#34353b; --accent:#7c93f5; --accent-text:#14151a; --off-bg:#e05555;
+      --off-text:#14151a; --hover-bg:#2b2c32; --full-text:#f28b82;
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Segoe UI",Roboto,sans-serif; min-height:100vh; padding:16px; }
+  .wrap { max-width:640px; margin:0 auto; }
+  h1 { font-size:20px; margin:4px 0 16px; }
+  .card { background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:18px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+  .card h2 { font-size:15px; margin:0 0 12px; color:var(--text-muted); font-weight:600; }
+  .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  button { padding:8px 14px; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; background:var(--accent); color:var(--accent-text); }
+  button.ghost { background:transparent; color:var(--text); border:1px solid var(--border); }
+  .month-nav { display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:14px; }
+  .month-nav .label { font-size:16px; font-weight:700; min-width:110px; text-align:center; }
+  .month-nav button { padding:6px 12px; }
+  .day-list { display:flex; flex-direction:column; gap:6px; max-height:480px; overflow-y:auto; padding-right:2px; }
+  .day-row { display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--bg); cursor:pointer; user-select:none; }
+  .day-row .date-label { width:80px; font-weight:600; font-size:14px; flex-shrink:0; }
+  .day-row .date-label.sat { color:#3b82f6; }
+  .day-row .date-label.sun { color:#ef4444; }
+  .day-row .off-label { flex:1; font-size:14px; font-weight:600; text-align:right; color:var(--text-muted); }
+  .day-row.selected { border-color:var(--off-bg); background: color-mix(in srgb, var(--off-bg) 10%, var(--bg)); }
+  .day-row.selected .off-label { color:var(--off-bg); }
+  .day-row.disabled { opacity:0.6; cursor:not-allowed; }
+  .legend { font-size:12px; color:var(--text-muted); margin-top:10px; }
+  .submit-row { margin-top:14px; display:flex; justify-content:flex-end; gap:8px; align-items:center; flex-wrap:wrap; }
+  .status-msg { font-size:13px; color:var(--text-muted); }
+  .empty-state { text-align:center; color:var(--text-muted); font-size:13px; padding:20px 0; }
+  .error-state { text-align:center; color:var(--full-text); font-size:14px; padding:24px 12px; font-weight:600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📅 希望休申請</h1>
+
+  <div class="card" id="noNameCard" style="display:none;">
+    <div class="error-state" id="noNameMsg"></div>
+  </div>
+
+  <div id="mainContent" style="display:none;">
+    <div class="card">
+      <h2>お名前</h2>
+      <div class="row" style="justify-content:space-between;">
+        <div style="font-size:16px; font-weight:700;" id="fixedNameLabel"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="month-nav">
+        <button class="ghost" onclick="changeMonth(-1)">◀ 前月</button>
+        <div class="label" id="monthLabel"></div>
+        <button class="ghost" onclick="changeMonth(1)">次月 ▶</button>
+      </div>
+      <div class="empty-state" id="monthClosedMsg" style="display:none;">この月の希望休受付は現在停止しています</div>
+      <div class="status-msg" id="alreadySubmittedMsg" style="display:none; margin-bottom:10px;">この月はすでに送信済みです。希望休は1回のみ送信できます（変更が必要な場合は管理者にご連絡ください）。</div>
+      <div class="status-msg" id="selectionSummary" style="margin-bottom:8px; font-weight:600;"></div>
+      <div class="day-list" id="dayListContainer"></div>
+      <div class="legend" id="dayListLegend">休みたい日をタップして選択してください。日数の上限はありません。送信は月ごとに1回のみです。</div>
+      <div class="submit-row" id="submitRow">
+        <span class="status-msg" id="submitStatus"></span>
+        <button id="submitBtn" onclick="submitRequest()">この内容で送信</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import {
+  db, doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs,
+  WEEKDAYS, monthKey, monthLabelText, daysInMonthOf
+} from "../common.js";
+
+let selectedEmployee = "";
+let currentDate = new Date();
+
+let offDaysSet = new Set();
+let savedOffDays = new Set();
+let empMonthDocs = [];
+let closedMonths = new Set();
+let hasSubmittedThisMonth = false;
+let employeesJp = [];
+
+// 名前選択のプルダウンはなし。URLの ?name=氏名 だけでアクセスする運用にする。
+const urlParams = new URLSearchParams(window.location.search);
+const nameFromUrl = urlParams.get('name');
+
+function showNoNameError(message) {
+  document.getElementById('noNameCard').style.display = '';
+  document.getElementById('noNameMsg').textContent = message;
+  document.getElementById('mainContent').style.display = 'none';
+}
+
+function renderEmployeeDayList() {
+  const ym = monthKey(currentDate);
+  const closedMsg = document.getElementById('monthClosedMsg');
+  const container = document.getElementById('dayListContainer');
+  const legend = document.getElementById('dayListLegend');
+  const submitRow = document.getElementById('submitRow');
+  document.getElementById('monthLabel').textContent = monthLabelText(currentDate);
+
+  if (closedMonths.has(ym)) {
+    closedMsg.style.display = 'block';
+    container.style.display = 'none';
+    legend.style.display = 'none';
+    submitRow.style.display = 'none';
+    return;
+  }
+  closedMsg.style.display = 'none';
+  container.style.display = '';
+  legend.style.display = '';
+  submitRow.style.display = '';
+
+  const alreadyMsg = document.getElementById('alreadySubmittedMsg');
+  const submitBtn = document.getElementById('submitBtn');
+  const summary = document.getElementById('selectionSummary');
+  alreadyMsg.style.display = hasSubmittedThisMonth ? 'block' : 'none';
+  submitBtn.disabled = hasSubmittedThisMonth;
+  submitBtn.style.opacity = hasSubmittedThisMonth ? '0.5' : '1';
+  submitBtn.style.cursor = hasSubmittedThisMonth ? 'not-allowed' : 'pointer';
+  summary.textContent = offDaysSet.size > 0 ? `選択中: ${offDaysSet.size}日` : "";
+
+  container.innerHTML = "";
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const daysInMonth = daysInMonthOf(currentDate);
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dow = new Date(year, month, day).getDay();
+    const isSelected = offDaysSet.has(day);
+
+    const row = document.createElement('div');
+    row.className = 'day-row' + (isSelected ? ' selected' : '') + (hasSubmittedThisMonth ? ' disabled' : '');
+
+    const dateLabel = document.createElement('div');
+    dateLabel.className = 'date-label' + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : '');
+    dateLabel.textContent = day + '日(' + WEEKDAYS[dow] + ')';
+    row.appendChild(dateLabel);
+
+    const offLabel = document.createElement('div');
+    offLabel.className = 'off-label';
+    offLabel.textContent = isSelected ? '× 休み希望' : '勤務';
+    row.appendChild(offLabel);
+
+    if (!hasSubmittedThisMonth) {
+      row.addEventListener('click', () => {
+        if (offDaysSet.has(day)) offDaysSet.delete(day);
+        else offDaysSet.add(day);
+        renderEmployeeDayList();
+      });
+    }
+    container.appendChild(row);
+  }
+}
+
+function changeMonth(delta) {
+  currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + delta, 1);
+  document.getElementById('submitStatus').textContent = "";
+  renderEmployeeDayList();
+  subscribeEmployeeMonth();
+}
+window.changeMonth = changeMonth;
+
+function applySelfFromCache() {
+  let selfDays = [];
+  let found = false;
+  empMonthDocs.forEach(d => {
+    if (d.employee === selectedEmployee) { selfDays = d.offDays || []; found = true; }
+  });
+  savedOffDays = new Set(selfDays);
+  offDaysSet = new Set(selfDays);
+  hasSubmittedThisMonth = found;
+}
+
+let unsubEmpMonth = null;
+function subscribeEmployeeMonth() {
+  if (unsubEmpMonth) { unsubEmpMonth(); unsubEmpMonth = null; }
+  const ym = monthKey(currentDate);
+  const q = query(collection(db, "requests"), where("yearMonth", "==", ym));
+  unsubEmpMonth = onSnapshot(q, snap => {
+    empMonthDocs = snap.docs.map(d => d.data());
+    applySelfFromCache();
+    renderEmployeeDayList();
+  }, err => console.error(err));
+}
+
+function subscribeMonthVisibility() {
+  onSnapshot(doc(db, "settings", "monthVisibility"), snap => {
+    const closed = snap.exists() ? (snap.data().closed || []) : [];
+    closedMonths = new Set(closed);
+    renderEmployeeDayList();
+  }, err => console.error(err));
+}
+
+async function submitRequest() {
+  if (!selectedEmployee) return;
+  if (hasSubmittedThisMonth) {
+    document.getElementById('submitStatus').textContent = "この月はすでに送信済みです。希望休は1回のみ送信できます。";
+    return;
+  }
+  document.getElementById('submitStatus').textContent = "送信中...";
+  const ym = monthKey(currentDate);
+  const ownDocRef = doc(db, "requests", selectedEmployee + "__" + ym);
+  try {
+    // 二重送信防止のため、送信直前にもう一度確認する
+    const ownSnap = await getDoc(ownDocRef);
+    if (ownSnap.exists()) {
+      hasSubmittedThisMonth = true;
+      savedOffDays = new Set(ownSnap.data().offDays || []);
+      offDaysSet = new Set(savedOffDays);
+      document.getElementById('submitStatus').textContent = "この月はすでに送信済みです。希望休は1回のみ送信できます。";
+      renderEmployeeDayList();
+      return;
+    }
+
+    const finalDays = Array.from(offDaysSet).sort((a, b) => a - b);
+
+    await setDoc(ownDocRef, {
+      employee: selectedEmployee,
+      yearMonth: ym,
+      offDays: finalDays,
+      updatedAt: new Date().toISOString()
+    });
+
+    offDaysSet = new Set(finalDays);
+    savedOffDays = new Set(finalDays);
+    hasSubmittedThisMonth = true;
+
+    document.getElementById('submitStatus').textContent = "送信しました ✓";
+    renderEmployeeDayList();
+  } catch (e) {
+    console.error(e);
+    document.getElementById('submitStatus').textContent = "送信に失敗しました";
+  }
+}
+window.submitRequest = submitRequest;
+
+function applyNameFromUrl() {
+  if (!nameFromUrl) {
+    showNoNameError("リンクに名前が含まれていません。管理者から受け取った専用のリンクを開いてください。");
+    return;
+  }
+  if (employeesJp.includes(nameFromUrl)) {
+    selectedEmployee = nameFromUrl;
+    document.getElementById('noNameCard').style.display = 'none';
+    document.getElementById('mainContent').style.display = '';
+    document.getElementById('fixedNameLabel').textContent = nameFromUrl;
+    applySelfFromCache();
+    renderEmployeeDayList();
+  } else if (employeesJp.length > 0) {
+    // 従業員リストは読み込まれたが該当する名前が見つからない
+    showNoNameError(`「${nameFromUrl}」という名前が見つかりませんでした。管理者に確認してください。`);
+  }
+  // employeesJp がまだ空(読み込み中)の場合は何もしない。読み込み後に再度呼ばれる。
+}
+
+function subscribeEmployeeListJp() {
+  onSnapshot(doc(db, "employeesJp", "list"), snap => {
+    employeesJp = snap.exists() ? (snap.data().names || []) : [];
+    applyNameFromUrl();
+  }, err => console.error(err));
+}
+
+async function init() {
+  document.getElementById('monthLabel').textContent = monthLabelText(currentDate);
+  subscribeEmployeeListJp();
+  subscribeEmployeeMonth();
+  subscribeMonthVisibility();
+}
+
+init();
+</script>
+</body>
+</html>
