@@ -34,19 +34,23 @@
   .month-nav { display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:14px; }
   .month-nav .label { font-size:16px; font-weight:700; min-width:110px; text-align:center; }
   .month-nav button { padding:6px 12px; }
-  table { width:100%; border-collapse:collapse; font-size:12px; }
-  th, td { border:1px solid var(--border); padding:4px 3px; text-align:center; min-width:26px; }
+  table { width:100%; border-collapse:collapse; font-size:11px; table-layout:fixed; }
+  th, td { border:1px solid var(--border); padding:2px 1px; text-align:center; overflow:hidden; }
   th { background:var(--hover-bg); position:sticky; top:0; }
-  td.emp-name, th.emp-name { text-align:left; font-weight:600; white-space:nowrap; position:sticky; left:0; background:var(--card-bg); }
+  td.emp-name, th.emp-name { text-align:left; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position:sticky; left:0; background:var(--card-bg); width:64px; }
   td.day-cell { cursor:pointer; }
+  th.day-col, td.day-col { width:22px; }
+  th.op-col, td.op-col { width:40px; }
   td.mark-off { background:var(--off-bg); color:var(--off-text); font-weight:700; }
   td.mark-admin { background:var(--admin-bg); color:var(--admin-text); font-weight:700; }
   td.mark-off.mark-admin { background:linear-gradient(135deg, var(--off-bg) 50%, var(--admin-bg) 50%); color:var(--off-text); }
-  td.quota-input-cell input { width:40px; padding:3px; font-size:11px; text-align:center; }
+  td.quota-input-cell input { width:100%; padding:1px; font-size:10px; text-align:center; border-radius:4px; -moz-appearance:textfield; }
+  td.quota-input-cell input::-webkit-outer-spin-button, td.quota-input-cell input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
   td.usage-cell { font-weight:700; }
   td.usage-cell.full { background:var(--full-bg); color:var(--full-text); }
   tr.quota-row td, tr.usage-row td { background:var(--hover-bg); }
   tr.row-pending td:not(.mark-off):not(.mark-admin) { background:var(--pending-bg); }
+  button.danger.cell-btn { padding:2px 4px; font-size:10px; white-space:nowrap; }
   .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .emp-manage-list { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
   .emp-manage-item { display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:var(--bg); border-radius:8px; border:1px solid var(--border); gap:8px; flex-wrap:wrap; }
@@ -251,16 +255,16 @@ function renderAdminTable() {
   let html = "<thead><tr><th class='emp-name'>氏名</th>";
   for (let d = 1; d <= daysInMonth; d++) {
     const dow = new Date(adminDate.getFullYear(), adminDate.getMonth(), d).getDay();
-    html += `<th style="color:${dow === 0 ? '#ef4444' : dow === 6 ? '#3b82f6' : 'inherit'}">${d}</th>`;
+    html += `<th class="day-col" style="color:${dow === 0 ? '#ef4444' : dow === 6 ? '#3b82f6' : 'inherit'}">${d}</th>`;
   }
-  html += "<th>操作</th></tr></thead><tbody>";
+  html += "<th class='op-col'>操作</th></tr></thead><tbody>";
 
   html += "<tr class='quota-row'><td class='emp-name'>上限設定</td>";
   for (let d = 1; d <= daysInMonth; d++) {
     const val = adminCapacityLimits[String(d)];
-    html += `<td class="quota-input-cell"><input type="number" min="0" value="${val !== undefined && val !== null ? val : ''}" placeholder="-" onchange="onQuotaInputChange(${d}, this.value)"></td>`;
+    html += `<td class="day-col quota-input-cell"><input type="number" min="0" value="${val !== undefined && val !== null ? val : ''}" placeholder="-" onchange="onQuotaInputChange(${d}, this.value)"></td>`;
   }
-  html += "<td></td></tr>";
+  html += "<td class='op-col'></td></tr>";
 
   html += "<tr class='usage-row'><td class='emp-name'>現在の希望者数</td>";
   for (let d = 1; d <= daysInMonth; d++) {
@@ -268,9 +272,9 @@ function renderAdminTable() {
     const limit = adminCapacityLimits[String(d)];
     const hasLimit = limit !== undefined && limit !== null && limit !== "";
     const isFull = hasLimit && count >= Number(limit);
-    html += `<td class="usage-cell${isFull ? ' full' : ''}">${count}</td>`;
+    html += `<td class="day-col usage-cell${isFull ? ' full' : ''}">${count}</td>`;
   }
-  html += "<td></td></tr>";
+  html += "<td class='op-col'></td></tr>";
 
   employees.forEach(name => {
     const rec = map[name] || { offDays: [], adminDays: [], submittedByEmployee: false };
@@ -281,16 +285,16 @@ function renderAdminTable() {
     for (let d = 1; d <= daysInMonth; d++) {
       const isOff = days.has(d);
       const isAdmin = adminDays.has(d);
-      const cls = ['day-cell'];
+      const cls = ['day-cell', 'day-col'];
       if (isOff) cls.push('mark-off');
       if (isAdmin) cls.push('mark-admin');
       const label = (isOff || isAdmin) ? '×' : '';
       html += `<td class="${cls.join(' ')}" onclick="toggleAdminDay('${safeName}', ${d})" title="クリックで管理者追加の休みを切り替え">${label}</td>`;
     }
     if (rec.submittedByEmployee) {
-      html += `<td><button class="danger" onclick="resetSubmission('${safeName}')">取消</button></td>`;
+      html += `<td class="op-col"><button class="danger cell-btn" onclick="resetSubmission('${safeName}')">取消</button></td>`;
     } else {
-      html += "<td></td>";
+      html += "<td class='op-col'></td>";
     }
     html += "</tr>";
   });
