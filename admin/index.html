@@ -301,7 +301,9 @@ function renderNoteList() {
   const map = adminRequestsCache[ym] || {};
   const card = document.getElementById('noteCard');
   const list = document.getElementById('noteList');
-  const entries = Object.entries(map).filter(([, rec]) => (rec.note || "").trim() !== "");
+  const currentNames = new Set(allEmployees());
+  // 従業員リストから削除された人の連絡事項は表示しない
+  const entries = Object.entries(map).filter(([name, rec]) => currentNames.has(name) && (rec.note || "").trim() !== "");
   if (entries.length === 0) {
     card.style.display = 'none';
     list.innerHTML = "";
@@ -419,6 +421,7 @@ function subscribeEmployeeList() {
     vnEmployees = snap.exists() ? (snap.data().names || []) : [];
     renderEmpManageList();
     renderAdminTable();
+    renderNoteList();
   }, err => console.error(err));
 }
 
