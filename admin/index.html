@@ -9,14 +9,14 @@
     --bg:#f7f7f8; --card-bg:#ffffff; --text:#1f2328; --text-muted:#6b7280;
     --border:#e2e4e8; --accent:#4f6bed; --accent-text:#ffffff; --off-bg:#ef4444;
     --off-text:#ffffff; --hover-bg:#f0f1f4; --full-bg:#fde2e2; --full-text:#b42318;
-    --admin-bg:#7c3aed; --admin-text:#ffffff;
+    --admin-bg:#7c3aed; --admin-text:#ffffff; --pending-bg:#dbeafe;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg:#17181c; --card-bg:#212227; --text:#eceef1; --text-muted:#9aa0aa;
       --border:#34353b; --accent:#7c93f5; --accent-text:#14151a; --off-bg:#e05555;
       --off-text:#14151a; --hover-bg:#2b2c32; --full-bg:#3a2222; --full-text:#f28b82;
-      --admin-bg:#a78bfa; --admin-text:#14151a;
+      --admin-bg:#a78bfa; --admin-text:#14151a; --pending-bg:#1e2f4d;
     }
   }
   * { box-sizing:border-box; }
@@ -46,6 +46,7 @@
   td.usage-cell { font-weight:700; }
   td.usage-cell.full { background:var(--full-bg); color:var(--full-text); }
   tr.quota-row td, tr.usage-row td { background:var(--hover-bg); }
+  tr.row-pending td:not(.mark-off):not(.mark-admin) { background:var(--pending-bg); }
   .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .emp-manage-list { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
   .emp-manage-item { display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:var(--bg); border-radius:8px; border:1px solid var(--border); gap:8px; flex-wrap:wrap; }
@@ -116,7 +117,7 @@ let vnEmployees = [];
 let adminDate = new Date();
 let adminRequestsCache = {};
 let adminCapacityLimits = {};
-let closedMonths = new Set();
+let openMonths = new Set();
 
 function allEmployees() {
   return vnEmployees;
@@ -165,8 +166,9 @@ function subscribeAdminCapacity() {
 
 function subscribeMonthVisibility() {
   onSnapshot(doc(db, "settings", "monthVisibility"), snap => {
-    const closed = snap.exists() ? (snap.data().closed || []) : [];
-    closedMonths = new Set(closed);
+    // 「open」に明示的に含まれている月だけ公開状態とする(未設定の月はデフォルトで非公開)
+    const open = snap.exists() ? (snap.data().open || []) : [];
+    openMonths = new Set(open);
     renderAdminVisibilityToggle();
   }, err => console.error(err));
 }
@@ -174,17 +176,17 @@ function subscribeMonthVisibility() {
 function renderAdminVisibilityToggle() {
   const btn = document.getElementById('visibilityToggleBtn');
   const ym = monthKey(adminDate);
-  const isClosed = closedMonths.has(ym);
-  btn.textContent = isClosed ? "🔒 この月は非公開中 → 公開する" : "✅ この月は公開中 → 非公開にする";
-  btn.className = isClosed ? "" : "ghost";
+  const isOpen = openMonths.has(ym);
+  btn.textContent = isOpen ? "✅ この月は公開中 → 非公開にする" : "🔒 この月は非公開中 → 公開する";
+  btn.className = isOpen ? "" : "ghost";
 }
 
 async function toggleMonthVisibility() {
   const ym = monthKey(adminDate);
-  const updated = new Set(closedMonths);
+  const updated = new Set(openMonths);
   if (updated.has(ym)) updated.delete(ym); else updated.add(ym);
   try {
-    await setDoc(doc(db, "settings", "monthVisibility"), { closed: Array.from(updated) });
+    await setDoc(doc(db, "settings", "monthVisibility"), { open: Array.from(updated) });
   } catch (e) { console.error(e); }
 }
 window.toggleMonthVisibility = toggleMonthVisibility;
@@ -275,7 +277,7 @@ function renderAdminTable() {
     const days = new Set(rec.offDays || []);
     const adminDays = new Set(rec.adminDays || []);
     const safeName = escapeHtml(name).replace(/'/g, "\\'");
-    html += `<tr><td class="emp-name">${escapeHtml(name)}</td>`;
+    html += `<tr class="${rec.submittedByEmployee ? '' : 'row-pending'}"><td class="emp-name">${escapeHtml(name)}</td>`;
     for (let d = 1; d <= daysInMonth; d++) {
       const isOff = days.has(d);
       const isAdmin = adminDays.has(d);
