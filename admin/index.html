@@ -79,10 +79,10 @@
       <table id="adminTable"><tbody></tbody></table>
     </div>
     <div class="hint">
-      「上限設定」の行に、その日に許可する希望休の人数を入力してください（空欄=上限なし）。「現在の希望者数」が上限に達すると赤く表示され、従業員側では選択できなくなります。<br>
+      「上限設定」の行に、その日に許可する希望休の人数を入力（空欄=上限なし）。「現在の希望者数」が上限に達すると赤く表示され、従業員側では選択できなくなります。<br>
       <span class="legend-swatch" style="background:var(--off-bg);"></span>従業員が選んだ休み(1か月最大6日まで)<br>
-      <span class="legend-swatch" style="background:var(--admin-bg);"></span>管理者が追加した休み(6日の上限とは関係なく、表の日付セルをクリックすると追加/解除できます)<br>
-      送信済みの従業員には表の右端に「取消」ボタンが表示され、押すとその月の送信を取り消して再送信できるようになります。
+      <span class="legend-swatch" style="background:var(--admin-bg);"></span>責任者が追加した休み(6日の上限とは関係なく、表の日付セルをクリックすると追加/解除できます)<br>
+      送信済みの従業員には表の右端に「取消」ボタンが表示され、押すと取り消して再送信できるようになります。
     </div>
     <div id="adminEmpty" class="empty-state" style="display:none;"></div>
     <div class="row" style="margin-top:12px; justify-content:flex-end;">
@@ -96,13 +96,13 @@
   </div>
 
   <div class="card">
-    <h2>従業員リストの管理</h2>
+    <h2>従業員リスト</h2>
     <div class="row">
       <input type="text" id="newEmpName" placeholder="新しい従業員名を入力">
       <button onclick="addEmployee()">追加</button>
     </div>
     <div class="emp-manage-list" id="empManageList"></div>
-    <div class="hint">「リンクをコピー」で、その従業員専用のURL(名前入り)をコピーできます。1か月に選べる日数の上限(6日)や、日ごとの人数上限が適用されます。</div>
+    <div class="hint">「リンクをコピー」で、その従業員専用のURLをコピーできます。</div>
   </div>
 </div>
 
@@ -235,7 +235,7 @@ function renderAdminTable() {
   if (employees.length === 0) {
     table.innerHTML = "";
     empty.style.display = 'block';
-    empty.textContent = "従業員が登録されていません。下の「従業員リストの管理」から追加してください。";
+    empty.textContent = "従業員が登録されていません。下の「従業員リスト」から追加してください。";
     return;
   }
   empty.style.display = 'none';
@@ -328,7 +328,7 @@ function renderNoteList() {
 
 async function resetSubmission(name) {
   const ym = monthKey(adminDate);
-  const ok = window.confirm(`${name}さんの${monthLabelText(adminDate)}分の送信済み希望休を取り消します。\n管理者が追加した休みや連絡事項も一緒に削除されます。\n取り消すと本人が再度送信できるようになります。よろしいですか？`);
+  const ok = window.confirm("取り消します。よろしいですか？");
   if (!ok) return;
   try {
     await deleteDoc(doc(db, "requests", name + "__" + ym));
