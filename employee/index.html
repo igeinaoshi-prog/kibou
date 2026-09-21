@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đăng ký ngày nghỉ mong muốn - Dành cho nhân viên</title>
+<style>
+  :root {
+    --bg:#f7f7f8; --card-bg:#ffffff; --text:#1f2328; --text-muted:#6b7280;
+    --border:#e2e4e8; --accent:#4f6bed; --accent-text:#ffffff; --off-bg:#ef4444;
+    --off-text:#ffffff; --hover-bg:#f0f1f4; --full-bg:#fde2e2; --full-text:#b42318;
+    --admin-bg:#7c3aed; --admin-text:#ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#17181c; --card-bg:#212227; --text:#eceef1; --text-muted:#9aa0aa;
+      --border:#34353b; --accent:#7c93f5; --accent-text:#14151a; --off-bg:#e05555;
+      --off-text:#14151a; --hover-bg:#2b2c32; --full-bg:#3a2222; --full-text:#f28b82;
+      --admin-bg:#a78bfa; --admin-text:#14151a;
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Segoe UI",Roboto,sans-serif; min-height:100vh; padding:16px; }
+  .wrap { max-width:640px; margin:0 auto; }
+  h1 { font-size:20px; margin:4px 0 16px; }
+  .card { background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:18px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+  .card h2 { font-size:15px; margin:0 0 12px; color:var(--text-muted); font-weight:600; }
+  .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  select { padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:14px; flex:1; min-width:120px; }
+  button { padding:8px 14px; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; background:var(--accent); color:var(--accent-text); }
+  button.ghost { background:transparent; color:var(--text); border:1px solid var(--border); }
+  .month-nav { display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:14px; }
+  .month-nav .label { font-size:16px; font-weight:700; min-width:150px; text-align:center; }
+  .month-nav button { padding:6px 12px; }
+  .day-list { display:flex; flex-direction:column; gap:6px; max-height:480px; overflow-y:auto; padding-right:2px; }
+  .day-row { display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--bg); }
+  .day-row .date-label { width:100px; font-weight:600; font-size:14px; flex-shrink:0; }
+  .day-row .date-label.sat { color:#3b82f6; }
+  .day-row .date-label.sun { color:#ef4444; }
+  .day-row .count-label { flex:1; font-size:12px; color:var(--text-muted); }
+  .day-row .count-label.full { color:var(--full-text); font-weight:700; }
+  .day-row select.day-select { min-width:150px; }
+  .day-row.selected { border-color:var(--off-bg); }
+  .day-row.admin-day { border-color:var(--admin-bg); background:color-mix(in srgb, var(--admin-bg) 12%, var(--bg)); }
+  .admin-badge { display:inline-block; background:var(--admin-bg); color:var(--admin-text); font-size:11px; font-weight:700; padding:2px 6px; border-radius:6px; flex-shrink:0; }
+  .legend { font-size:12px; color:var(--text-muted); margin-top:10px; }
+  .submit-row { margin-top:14px; display:flex; justify-content:flex-end; gap:8px; align-items:center; flex-wrap:wrap; }
+  .status-msg { font-size:13px; color:var(--text-muted); }
+  .empty-state { text-align:center; color:var(--text-muted); font-size:13px; padding:20px 0; }
+  .error-state { text-align:center; color:var(--full-text); font-size:14px; padding:24px 12px; font-weight:600; }
+  textarea.note-input { width:100%; min-height:70px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:14px; font-family:inherit; resize:vertical; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📅 Đăng ký ngày nghỉ mong muốn</h1>
+
+  <div class="card" id="noNameCard" style="display:none;">
+    <div class="error-state" id="noNameMsg"></div>
+  </div>
+
+  <div id="mainContent" style="display:none;">
+    <div class="card">
+      <h2>Tên của bạn</h2>
+      <div class="row" style="justify-content:space-between;">
+        <div style="font-size:16px; font-weight:700;" id="fixedNameLabel"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="month-nav">
+        <button class="ghost" onclick="changeMonth(-1)">◀ Tháng trước</button>
+        <div class="label" id="monthLabel"></div>
+        <button class="ghost" onclick="changeMonth(1)">Tháng sau ▶</button>
+      </div>
+      <div class="empty-state" id="monthClosedMsg" style="display:none;">Hiện tại tháng này chưa mở đăng ký ngày nghỉ</div>
+      <div class="status-msg" id="alreadySubmittedMsg" style="display:none; margin-bottom:10px;">Bạn đã gửi đăng ký cho tháng này rồi. Mỗi tháng chỉ được gửi 1 lần (nếu cần thay đổi, vui lòng liên hệ quản lý).</div>
+      <div class="status-msg" id="selectionSummary" style="margin-bottom:8px; font-weight:600;"></div>
+      <div class="day-list" id="dayListContainer"></div>
+      <div class="legend" id="dayListLegend">Hãy chọn "×(Muốn nghỉ)" trong danh sách thả xuống của từng ngày. Mỗi tháng chỉ được chọn tối đa 6 ngày. Những ngày đã đủ số lượng sẽ không thể chọn. Những ngày có nhãn "Công ty chỉ định" là do quản lý thêm vào và không tính vào giới hạn 6 ngày của bạn. Mỗi tháng chỉ được gửi đăng ký 1 lần.</div>
+      <div class="row" style="margin-top:12px; flex-direction:column; align-items:stretch;" id="noteRow">
+        <label for="noteInput" style="font-size:13px; font-weight:600; margin-bottom:6px;">Ghi chú (ví dụ: xin nghỉ phép có lương, việc cần báo cáo khác)</label>
+        <textarea id="noteInput" class="note-input" placeholder="Nhập nội dung nếu có (không bắt buộc)"></textarea>
+      </div>
+      <div class="submit-row" id="submitRow">
+        <span class="status-msg" id="submitStatus"></span>
+        <button id="submitBtn" onclick="submitRequest()">Gửi đăng ký</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import {
+  db, doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs,
+  monthKey, daysInMonthOf
+} from "../common.js";
+
+// 月表示はベトナム語形式にする(管理者ページ側の日本語表記には影響させない)
+const MONTH_NAMES_VN = [
+  "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",
+  "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
+];
+function monthLabelText(d) {
+  return MONTH_NAMES_VN[d.getMonth()] + " năm " + d.getFullYear();
+}
+
+// Chữ viết tắt các thứ trong tuần bằng tiếng Việt (Chủ Nhật, Thứ Hai, ...)
+const WEEKDAYS_VN = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+
+let employees = [];
+let selectedEmployee = "";
+let currentDate = new Date();
+
+let offDaysSet = new Set();
+let savedOffDays = new Set();
+let adminDaysSet = new Set();
+let savedNote = "";
+let empMonthCounts = {};
+let empMonthDocs = [];
+let empCapacityLimits = {};
+let closedMonths = new Set();
+let hasSubmittedThisMonth = false;
+const MAX_OFF_DAYS = 6;
+
+// 名前選択のプルダウンは廃止。URLの ?name=氏名 だけでアクセスする運用にする。
+const urlParams = new URLSearchParams(window.location.search);
+const nameFromUrl = urlParams.get('name');
+
+function showNoNameError(message) {
+  document.getElementById('noNameCard').style.display = '';
+  document.getElementById('noNameMsg').textContent = message;
+  document.getElementById('mainContent').style.display = 'none';
+}
+
+function renderEmployeeDayList() {
+  const ym = monthKey(currentDate);
+  const closedMsg = document.getElementById('monthClosedMsg');
+  const container = document.getElementById('dayListContainer');
+  const legend = document.getElementById('dayListLegend');
+  const submitRow = document.getElementById('submitRow');
+  document.getElementById('monthLabel').textContent = monthLabelText(currentDate);
+
+  if (closedMonths.has(ym)) {
+    closedMsg.style.display = 'block';
+    container.style.display = 'none';
+    legend.style.display = 'none';
+    submitRow.style.display = 'none';
+    return;
+  }
+  closedMsg.style.display = 'none';
+  container.style.display = '';
+  legend.style.display = '';
+  submitRow.style.display = '';
+
+  const alreadyMsg = document.getElementById('alreadySubmittedMsg');
+  const submitBtn = document.getElementById('submitBtn');
+  const summary = document.getElementById('selectionSummary');
+  alreadyMsg.style.display = hasSubmittedThisMonth ? 'block' : 'none';
+  submitBtn.disabled = hasSubmittedThisMonth;
+  submitBtn.style.opacity = hasSubmittedThisMonth ? '0.5' : '1';
+  submitBtn.style.cursor = hasSubmittedThisMonth ? 'not-allowed' : 'pointer';
+  summary.textContent = `Đã chọn: ${offDaysSet.size}/${MAX_OFF_DAYS} ngày`;
+  summary.style.color = offDaysSet.size >= MAX_OFF_DAYS ? 'var(--full-text)' : 'var(--text-muted)';
+
+  container.innerHTML = "";
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const daysInMonth = daysInMonthOf(currentDate);
+  const personalLimitReached = offDaysSet.size >= MAX_OFF_DAYS;
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dow = new Date(year, month, day).getDay();
+    const total = empMonthCounts[day] || 0;
+    const otherCount = total - (savedOffDays.has(day) ? 1 : 0);
+    const limit = empCapacityLimits[String(day)];
+    const hasLimit = limit !== undefined && limit !== null && limit !== "";
+    const isFull = hasLimit && otherCount >= Number(limit);
+    const isSelected = offDaysSet.has(day);
+    const isAdminDay = adminDaysSet.has(day);
+    const blockedByPersonalLimit = personalLimitReached && !isSelected;
+
+    const row = document.createElement('div');
+    row.className = 'day-row' + (isSelected ? ' selected' : '') + (isAdminDay ? ' admin-day' : '');
+
+    const dateLabel = document.createElement('div');
+    dateLabel.className = 'date-label' + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : '');
+    dateLabel.textContent = 'Ngày ' + day + ' (' + WEEKDAYS_VN[dow] + ')';
+    row.appendChild(dateLabel);
+
+    if (isAdminDay) {
+      const badge = document.createElement('span');
+      badge.className = 'admin-badge';
+      badge.textContent = 'Công ty chỉ định';
+      row.appendChild(badge);
+    }
+
+    const countLabel = document.createElement('div');
+    countLabel.className = 'count-label' + (isFull ? ' full' : '');
+    countLabel.textContent = hasLimit
+      ? `${otherCount + (isSelected ? 1 : 0)}/${limit} người muốn nghỉ`
+      : `${otherCount + (isSelected ? 1 : 0)} người muốn nghỉ`;
+    row.appendChild(countLabel);
+
+    const select = document.createElement('select');
+    select.className = 'day-select';
+    const optWork = document.createElement('option');
+    optWork.value = "";
+    optWork.textContent = "(Đi làm)";
+    const optOff = document.createElement('option');
+    optOff.value = "off";
+    if (isFull && !isSelected) optOff.textContent = "× (Đã đủ số lượng)";
+    else if (blockedByPersonalLimit) optOff.textContent = "× (Đã đủ 6 ngày)";
+    else optOff.textContent = "× (Muốn nghỉ)";
+    optOff.disabled = (isFull && !isSelected) || blockedByPersonalLimit;
+    select.appendChild(optWork);
+    select.appendChild(optOff);
+    select.value = isSelected ? "off" : "";
+    select.disabled = hasSubmittedThisMonth;
+    select.addEventListener('change', (e) => {
+      if (e.target.value === 'off') {
+        if (offDaysSet.size >= MAX_OFF_DAYS) {
+          e.target.value = "";
+          renderEmployeeDayList();
+          return;
+        }
+        offDaysSet.add(day);
+      } else {
+        offDaysSet.delete(day);
+      }
+      renderEmployeeDayList();
+    });
+    row.appendChild(select);
+    container.appendChild(row);
+  }
+}
+
+function changeMonth(delta) {
+  currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + delta, 1);
+  document.getElementById('submitStatus').textContent = "";
+  renderEmployeeDayList();
+  subscribeEmployeeMonth();
+  subscribeEmployeeCapacity();
+}
+window.changeMonth = changeMonth;
+
+function applySelfFromCache() {
+  let selfDays = [];
+  let selfAdminDays = [];
+  let selfNote = "";
+  let found = false;
+  empMonthDocs.forEach(d => {
+    if (d.employee === selectedEmployee) {
+      selfDays = d.offDays || [];
+      selfAdminDays = d.adminDays || [];
+      selfNote = d.note || "";
+      // offDaysフィールドが存在する(=本人が一度送信した)場合のみ「送信済み」とする。
+      // 管理者が休みを追加しただけでは送信済み扱いにしない。
+      found = Array.isArray(d.offDays);
+    }
+  });
+  savedOffDays = new Set(selfDays);
+  offDaysSet = new Set(selfDays);
+  adminDaysSet = new Set(selfAdminDays);
+  savedNote = selfNote;
+  hasSubmittedThisMonth = found;
+  syncNoteField();
+}
+
+function syncNoteField() {
+  const el = document.getElementById('noteInput');
+  if (!el) return;
+  el.value = savedNote;
+  el.disabled = hasSubmittedThisMonth;
+}
+
+function recomputeEmpMonthCounts() {
+  const counts = {};
+  empMonthDocs.forEach(d => {
+    const combined = new Set([...(d.offDays || []), ...(d.adminDays || [])]);
+    combined.forEach(day => { counts[day] = (counts[day] || 0) + 1; });
+  });
+  empMonthCounts = counts;
+}
+
+let unsubEmpMonth = null;
+function subscribeEmployeeMonth() {
+  if (unsubEmpMonth) { unsubEmpMonth(); unsubEmpMonth = null; }
+  const ym = monthKey(currentDate);
+  const q = query(collection(db, "requests"), where("yearMonth", "==", ym));
+  unsubEmpMonth = onSnapshot(q, snap => {
+    empMonthDocs = snap.docs.map(d => d.data());
+    recomputeEmpMonthCounts();
+    applySelfFromCache();
+    renderEmployeeDayList();
+  }, err => console.error(err));
+}
+
+let unsubEmpCapacity = null;
+function subscribeEmployeeCapacity() {
+  if (unsubEmpCapacity) { unsubEmpCapacity(); unsubEmpCapacity = null; }
+  const ym = monthKey(currentDate);
+  unsubEmpCapacity = onSnapshot(doc(db, "capacity", ym), snap => {
+    empCapacityLimits = snap.exists() ? (snap.data().limits || {}) : {};
+    renderEmployeeDayList();
+  }, err => console.error(err));
+}
+
+function subscribeMonthVisibility() {
+  onSnapshot(doc(db, "settings", "monthVisibility"), snap => {
+    const closed = snap.exists() ? (snap.data().closed || []) : [];
+    closedMonths = new Set(closed);
+    renderEmployeeDayList();
+  }, err => console.error(err));
+}
+
+async function submitRequest() {
+  if (!selectedEmployee) return;
+  if (hasSubmittedThisMonth) {
+    document.getElementById('submitStatus').textContent = "Bạn đã gửi đăng ký cho tháng này rồi. Mỗi tháng chỉ được gửi 1 lần.";
+    return;
+  }
+  document.getElementById('submitStatus').textContent = "Đang gửi...";
+  const ym = monthKey(currentDate);
+  const ownDocRef = doc(db, "requests", selectedEmployee + "__" + ym);
+  const noteValue = (document.getElementById('noteInput').value || "").trim();
+  try {
+    const ownSnap = await getDoc(ownDocRef);
+    // offDaysフィールドがすでにあれば「本人が送信済み」。
+    // 管理者がadminDaysだけ追加している状態(offDaysが無い)は送信済みとみなさない。
+    if (ownSnap.exists() && Array.isArray(ownSnap.data().offDays)) {
+      hasSubmittedThisMonth = true;
+      savedOffDays = new Set(ownSnap.data().offDays || []);
+      offDaysSet = new Set(savedOffDays);
+      savedNote = ownSnap.data().note || "";
+      syncNoteField();
+      document.getElementById('submitStatus').textContent = "Bạn đã gửi đăng ký cho tháng này rồi. Mỗi tháng chỉ được gửi 1 lần.";
+      renderEmployeeDayList();
+      return;
+    }
+
+    const q = query(collection(db, "requests"), where("yearMonth", "==", ym));
+    const [reqSnap, capSnap] = await Promise.all([getDocs(q), getDoc(doc(db, "capacity", ym))]);
+    const freshCounts = {};
+    reqSnap.docs.forEach(d => {
+      const data = d.data();
+      if (data.employee === selectedEmployee) return;
+      (data.offDays || []).forEach(day => { freshCounts[day] = (freshCounts[day] || 0) + 1; });
+    });
+    const limits = capSnap.exists() ? (capSnap.data().limits || {}) : {};
+    const removed = [];
+    const finalDays = [];
+    Array.from(offDaysSet).sort((a, b) => a - b).forEach(day => {
+      if (finalDays.length >= MAX_OFF_DAYS) { removed.push(day); return; }
+      const limit = limits[String(day)];
+      const hasLimit = limit !== undefined && limit !== null && limit !== "";
+      const other = freshCounts[day] || 0;
+      if (hasLimit && other >= Number(limit)) removed.push(day);
+      else finalDays.push(day);
+    });
+
+    // adminDaysなど、管理者がすでに設定している内容は消さないようmergeで書き込む
+    await setDoc(ownDocRef, {
+      employee: selectedEmployee,
+      yearMonth: ym,
+      offDays: finalDays,
+      note: noteValue,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    offDaysSet = new Set(finalDays);
+    savedOffDays = new Set(finalDays);
+    savedNote = noteValue;
+    hasSubmittedThisMonth = true;
+    syncNoteField();
+
+    document.getElementById('submitStatus').textContent = removed.length > 0
+      ? `Đã gửi (Các ngày ${removed.join(', ')} đã đủ số lượng nên bị hủy chọn)`
+      : "Đã gửi thành công ✓";
+    renderEmployeeDayList();
+  } catch (e) {
+    console.error(e);
+    document.getElementById('submitStatus').textContent = "Gửi thất bại";
+  }
+}
+window.submitRequest = submitRequest;
+
+function applyNameFromUrl() {
+  if (!nameFromUrl) {
+    showNoNameError("Không tìm thấy tên trong liên kết. Vui lòng dùng đúng liên kết mà quản lý đã gửi cho bạn.");
+    return;
+  }
+  if (employees.includes(nameFromUrl)) {
+    selectedEmployee = nameFromUrl;
+    document.getElementById('noNameCard').style.display = 'none';
+    document.getElementById('mainContent').style.display = '';
+    document.getElementById('fixedNameLabel').textContent = nameFromUrl;
+    applySelfFromCache();
+    renderEmployeeDayList();
+  } else if (employees.length > 0) {
+    // 従業員リストは読み込まれたが該当する名前が見つからない
+    showNoNameError(`Không tìm thấy tên "${nameFromUrl}". Vui lòng liên hệ quản lý để được cấp lại liên kết.`);
+  }
+  // employees がまだ空(読み込み中)の場合は何もしない。読み込み後に再度呼ばれる。
+}
+
+function subscribeEmployeeList() {
+  onSnapshot(doc(db, "employees", "list"), snap => {
+    employees = snap.exists() ? (snap.data().names || []) : [];
+    applyNameFromUrl();
+  }, err => console.error(err));
+}
+
+async function init() {
+  document.getElementById('monthLabel').textContent = monthLabelText(currentDate);
+  subscribeEmployeeList();
+  subscribeEmployeeMonth();
+  subscribeEmployeeCapacity();
+  subscribeMonthVisibility();
+}
+
+init();
+</script>
+</body>
+</html>
