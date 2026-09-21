@@ -37,7 +37,7 @@
   table { width:100%; border-collapse:collapse; font-size:11px; table-layout:fixed; }
   th, td { border:1px solid var(--border); padding:2px 1px; text-align:center; overflow:hidden; }
   th { background:var(--hover-bg); position:sticky; top:0; }
-  td.emp-name, th.emp-name { text-align:left; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position:sticky; left:0; background:var(--card-bg); width:64px; }
+  td.emp-name, th.emp-name { text-align:left; font-weight:600; white-space:normal; overflow-wrap:break-word; word-break:break-word; line-height:1.2; position:sticky; left:0; background:var(--card-bg); width:46px; font-size:9px; vertical-align:middle; }
   td.day-cell { cursor:pointer; }
   th.day-col, td.day-col { width:22px; }
   th.op-col, td.op-col { width:40px; }
