@@ -121,6 +121,8 @@ let vnEmployees = [];
 let adminDate = new Date();
 let adminRequestsCache = {};
 let adminCapacityLimits = {};
+let adminOutValues = {};
+let adminStayValues = {};
 let openMonths = new Set();
 
 function allEmployees() {
@@ -163,7 +165,10 @@ function subscribeAdminCapacity() {
   if (unsubAdminCapacity) { unsubAdminCapacity(); unsubAdminCapacity = null; }
   const ym = monthKey(adminDate);
   unsubAdminCapacity = onSnapshot(doc(db, "capacity", ym), snap => {
-    adminCapacityLimits = snap.exists() ? (snap.data().limits || {}) : {};
+    const data = snap.exists() ? snap.data() : {};
+    adminCapacityLimits = data.limits || {};
+    adminOutValues = data.out || {};
+    adminStayValues = data.stay || {};
     renderAdminTable();
   }, err => console.error(err));
 }
@@ -206,6 +211,30 @@ async function onQuotaInputChange(day, value) {
   } catch (e) { console.error(e); }
 }
 window.onQuotaInputChange = onQuotaInputChange;
+
+async function onOutInputChange(day, value) {
+  const ym = monthKey(adminDate);
+  const updated = { ...adminOutValues };
+  if (value === "" || value === null || isNaN(Number(value))) delete updated[String(day)];
+  else updated[String(day)] = Number(value);
+  adminOutValues = updated;
+  try {
+    await setDoc(doc(db, "capacity", ym), { out: updated }, { merge: true });
+  } catch (e) { console.error(e); }
+}
+window.onOutInputChange = onOutInputChange;
+
+async function onStayInputChange(day, value) {
+  const ym = monthKey(adminDate);
+  const updated = { ...adminStayValues };
+  if (value === "" || value === null || isNaN(Number(value))) delete updated[String(day)];
+  else updated[String(day)] = Number(value);
+  adminStayValues = updated;
+  try {
+    await setDoc(doc(db, "capacity", ym), { stay: updated }, { merge: true });
+  } catch (e) { console.error(e); }
+}
+window.onStayInputChange = onStayInputChange;
 
 // 管理者が表のセルをクリックして、従業員の6日上限とは関係なく休みを追加/解除する
 async function toggleAdminDay(name, day) {
@@ -258,6 +287,20 @@ function renderAdminTable() {
     html += `<th class="day-col" style="color:${dow === 0 ? '#ef4444' : dow === 6 ? '#3b82f6' : 'inherit'}">${d}</th>`;
   }
   html += "<th class='op-col'>操作</th></tr></thead><tbody>";
+
+  html += "<tr class='quota-row'><td class='emp-name'>アウト</td>";
+  for (let d = 1; d <= daysInMonth; d++) {
+    const val = adminOutValues[String(d)];
+    html += `<td class="day-col quota-input-cell"><input type="number" min="0" value="${val !== undefined && val !== null ? val : ''}" placeholder="-" onchange="onOutInputChange(${d}, this.value)"></td>`;
+  }
+  html += "<td class='op-col'></td></tr>";
+
+  html += "<tr class='quota-row'><td class='emp-name'>ステイ</td>";
+  for (let d = 1; d <= daysInMonth; d++) {
+    const val = adminStayValues[String(d)];
+    html += `<td class="day-col quota-input-cell"><input type="number" min="0" value="${val !== undefined && val !== null ? val : ''}" placeholder="-" onchange="onStayInputChange(${d}, this.value)"></td>`;
+  }
+  html += "<td class='op-col'></td></tr>";
 
   html += "<tr class='quota-row'><td class='emp-name'>上限設定</td>";
   for (let d = 1; d <= daysInMonth; d++) {
@@ -452,6 +495,18 @@ function exportExcel() {
   // ヘッダー行
   rows.push(["氏名", ...dayHeaders, "連絡事項"]);
 
+  // アウト行
+  rows.push(["アウト", ...dayHeaders.map(d => {
+    const val = adminOutValues[String(d)];
+    return (val !== undefined && val !== null && val !== "") ? Number(val) : "";
+  }), ""]);
+
+  // ステイ行
+  rows.push(["ステイ", ...dayHeaders.map(d => {
+    const val = adminStayValues[String(d)];
+    return (val !== undefined && val !== null && val !== "") ? Number(val) : "";
+  }), ""]);
+
   // 上限設定行
   rows.push(["上限設定", ...dayHeaders.map(d => {
     const val = adminCapacityLimits[String(d)];
@@ -478,9 +533,9 @@ function exportExcel() {
   // 列幅の調整(氏名列は広め、日付列は狭め、連絡事項列は広め)
   ws['!cols'] = [{ wch: 14 }, ...dayHeaders.map(() => ({ wch: 4 })), { wch: 30 }];
 
-  // 上部3行(ヘッダー・上限設定・希望者数)を常に表示したままスクロールできるようにする
-  ws['!freeze'] = { xSplit: 1, ySplit: 3 };
-  ws['!panes'] = [{ xSplit: 1, ySplit: 3, topLeftCell: "B4", activePane: "bottomRight", state: "frozen" }];
+  // 上部5行(ヘッダー・アウト・ステイ・上限設定・希望者数)を常に表示したままスクロールできるようにする
+  ws['!freeze'] = { xSplit: 1, ySplit: 5 };
+  ws['!panes'] = [{ xSplit: 1, ySplit: 5, topLeftCell: "B6", activePane: "bottomRight", state: "frozen" }];
 
   const wb = XLSX.utils.book_new();
   const sheetName = monthLabelText(adminDate).replace(/[\\/?*[\]:]/g, "");
