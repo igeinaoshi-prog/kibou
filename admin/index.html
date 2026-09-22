@@ -207,7 +207,7 @@ async function onQuotaInputChange(day, value) {
   else updated[String(day)] = Number(value);
   adminCapacityLimits = updated;
   try {
-    await setDoc(doc(db, "capacity", ym), { limits: updated });
+    await setDoc(doc(db, "capacity", ym), { limits: updated }, { merge: true });
   } catch (e) { console.error(e); }
 }
 window.onQuotaInputChange = onQuotaInputChange;
