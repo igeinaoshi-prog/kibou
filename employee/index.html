@@ -198,9 +198,16 @@ function renderEmployeeDayList() {
 
     const countLabel = document.createElement('div');
     countLabel.className = 'count-label' + (isFull ? ' full' : '');
-    countLabel.textContent = hasLimit
-      ? `${otherCount + (isSelected ? 1 : 0)}/${limit} người muốn nghỉ`
-      : `${otherCount + (isSelected ? 1 : 0)} người muốn nghỉ`;
+    const shownCount = otherCount + (isSelected ? 1 : 0);
+    if (hasLimit && shownCount >= Number(limit)) {
+      // 上限に達した(または超えた)日は「4/3」のような数字ではなく「満員」と表示する
+      countLabel.textContent = "Đã đủ người (hết chỗ)";
+      countLabel.classList.add('full');
+    } else {
+      countLabel.textContent = hasLimit
+        ? `${shownCount}/${limit} người muốn nghỉ`
+        : `${shownCount} người muốn nghỉ`;
+    }
     row.appendChild(countLabel);
 
     const select = document.createElement('select');
