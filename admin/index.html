@@ -40,7 +40,8 @@
   td.emp-name, th.emp-name { text-align:left; font-weight:600; white-space:normal; overflow-wrap:break-word; word-break:break-word; line-height:1.2; position:sticky; left:0; background:var(--card-bg); width:46px; font-size:9px; vertical-align:middle; }
   td.day-cell { cursor:pointer; }
   th.day-col, td.day-col { width:22px; }
-  th.op-col, td.op-col { width:40px; }
+  th.op-col, td.op-col { width:76px; }
+  .off-count { font-weight:700; font-size:10px; margin-right:3px; white-space:nowrap; }
   td.mark-off { background:var(--off-bg); color:var(--off-text); font-weight:700; }
   td.mark-admin { background:var(--admin-bg); color:var(--admin-text); font-weight:700; }
   td.mark-off.mark-admin { background:linear-gradient(135deg, var(--off-bg) 50%, var(--admin-bg) 50%); color:var(--off-text); }
@@ -337,10 +338,12 @@ function renderAdminTable() {
       const label = (isOff || isAdmin) ? '×' : '';
       html += `<td class="${cls.join(' ')}" onclick="toggleAdminDay('${safeName}', ${d})" title="クリックで管理者追加の休みを切り替え">${label}</td>`;
     }
+    const totalOffCount = new Set([...(rec.offDays || []), ...(rec.adminDays || [])]).size;
+    const countBadge = `<span class="off-count" title="現在の希望休数">${totalOffCount}日</span>`;
     if (rec.submittedByEmployee) {
-      html += `<td class="op-col"><button class="danger cell-btn" onclick="resetSubmission('${safeName}')">取消</button></td>`;
+      html += `<td class="op-col">${countBadge}<button class="danger cell-btn" onclick="resetSubmission('${safeName}')">取消</button></td>`;
     } else {
-      html += "<td class='op-col'></td>";
+      html += `<td class="op-col">${countBadge}</td>`;
     }
     html += "</tr>";
   });
