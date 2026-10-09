@@ -77,7 +77,7 @@
       <div class="status-msg" id="alreadySubmittedMsg" style="display:none; margin-bottom:10px;">Bạn đã gửi đăng ký cho tháng này rồi. Mỗi tháng chỉ được gửi 1 lần (nếu cần thay đổi, vui lòng liên hệ quản lý).</div>
       <div class="status-msg" id="selectionSummary" style="margin-bottom:8px; font-weight:600;"></div>
       <div class="day-list" id="dayListContainer"></div>
-      <div class="legend" id="dayListLegend">Hãy chọn "×(Muốn nghỉ)" trong danh sách thả xuống của từng ngày. Mỗi tháng chỉ được chọn tối đa 6 ngày. Những ngày đã đủ số lượng sẽ không thể chọn. Những ngày có nhãn "Công ty chỉ định" là do quản lý thêm vào và không tính vào giới hạn 6 ngày của bạn. Mỗi tháng chỉ được gửi đăng ký 1 lần.</div>
+      <div class="legend" id="dayListLegend">Hãy chọn "×(Muốn nghỉ)" trong danh sách thả xuống của từng ngày. Mỗi tháng chỉ được chọn tối đa 4 ngày. Những ngày đã đủ số lượng sẽ không thể chọn. Những ngày có nhãn "Công ty chỉ định" là do quản lý thêm vào và không tính vào giới hạn 4 ngày của bạn. Mỗi tháng chỉ được gửi đăng ký 1 lần.</div>
       <div class="row" style="margin-top:12px; flex-direction:column; align-items:stretch;" id="noteRow">
         <label for="noteInput" style="font-size:13px; font-weight:600; margin-bottom:6px;">Ghi chú (ví dụ: xin nghỉ phép có lương, việc cần báo cáo khác)</label>
         <textarea id="noteInput" class="note-input" placeholder="Nhập nội dung nếu có (không bắt buộc)"></textarea>
@@ -121,7 +121,7 @@ let empMonthDocs = [];
 let empCapacityLimits = {};
 let openMonths = new Set();
 let hasSubmittedThisMonth = false;
-const MAX_OFF_DAYS = 6;
+const MAX_OFF_DAYS = 4;
 
 // 名前選択のプルダウンは廃止。URLの ?name=氏名 だけでアクセスする運用にする。
 const urlParams = new URLSearchParams(window.location.search);
@@ -211,7 +211,7 @@ function renderEmployeeDayList() {
     const optOff = document.createElement('option');
     optOff.value = "off";
     if (isFull && !isSelected) optOff.textContent = "× (Đã đủ số lượng)";
-    else if (blockedByPersonalLimit) optOff.textContent = "× (Đã đủ 6 ngày)";
+    else if (blockedByPersonalLimit) optOff.textContent = "× (Đã đủ 4 ngày)";
     else optOff.textContent = "× (Muốn nghỉ)";
     optOff.disabled = (isFull && !isSelected) || blockedByPersonalLimit;
     select.appendChild(optWork);
@@ -277,7 +277,10 @@ function syncNoteField() {
 
 function recomputeEmpMonthCounts() {
   const counts = {};
+  const currentNamesForCount = new Set(employees);
+  // 従業員リストから削除された人のデータは希望者数のカウントに含めない
   empMonthDocs.forEach(d => {
+    if (!currentNamesForCount.has(d.employee)) return;
     const combined = new Set([...(d.offDays || []), ...(d.adminDays || [])]);
     combined.forEach(day => { counts[day] = (counts[day] || 0) + 1; });
   });
@@ -359,9 +362,12 @@ async function submitRequest() {
     const q = query(collection(db, "requests"), where("yearMonth", "==", ym));
     const [reqSnap, capSnap] = await Promise.all([getDocs(q), getDoc(doc(db, "capacity", ym))]);
     const freshCounts = {};
+    const currentNamesForCount = new Set(employees);
     reqSnap.docs.forEach(d => {
       const data = d.data();
       if (data.employee === selectedEmployee) return;
+      // 従業員リストから削除された人のデータは人数カウントに含めない
+      if (!currentNamesForCount.has(data.employee)) return;
       (data.offDays || []).forEach(day => { freshCounts[day] = (freshCounts[day] || 0) + 1; });
     });
     const limits = capSnap.exists() ? (capSnap.data().limits || {}) : {};
@@ -412,6 +418,7 @@ function applyNameFromUrl() {
     document.getElementById('noNameCard').style.display = 'none';
     document.getElementById('mainContent').style.display = '';
     document.getElementById('fixedNameLabel').textContent = nameFromUrl;
+    recomputeEmpMonthCounts();
     applySelfFromCache();
     renderEmployeeDayList();
   } else if (employees.length > 0) {

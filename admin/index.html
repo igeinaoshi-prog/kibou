@@ -85,8 +85,8 @@
     </div>
     <div class="hint">
       「上限設定」の行に、その日に許可する希望休の人数を入力（空欄=上限なし）。「現在の希望者数」が上限に達すると赤く表示され、従業員側では選択できなくなります。<br>
-      <span class="legend-swatch" style="background:var(--off-bg);"></span>従業員が選んだ休み(1か月最大6日まで)<br>
-      <span class="legend-swatch" style="background:var(--admin-bg);"></span>責任者が追加した休み(6日の上限とは関係なく、表の日付セルをクリックすると追加/解除できます)<br>
+      <span class="legend-swatch" style="background:var(--off-bg);"></span>従業員が選んだ休み(1か月最大4日まで)<br>
+      <span class="legend-swatch" style="background:var(--admin-bg);"></span>責任者が追加した休み(4日の上限とは関係なく、表の日付セルをクリックすると追加/解除できます)<br>
       送信済みの従業員には表の右端に「取消」ボタンが表示され、押すと取り消して再送信できるようになります。
     </div>
     <div id="adminEmpty" class="empty-state" style="display:none;"></div>
@@ -236,7 +236,7 @@ async function onStayInputChange(day, value) {
 }
 window.onStayInputChange = onStayInputChange;
 
-// 管理者が表のセルをクリックして、従業員の6日上限とは関係なく休みを追加/解除する
+// 管理者が表のセルをクリックして、従業員の4日上限とは関係なく休みを追加/解除する
 async function toggleAdminDay(name, day) {
   const ym = monthKey(adminDate);
   const map = adminRequestsCache[ym] || {};
@@ -276,7 +276,10 @@ function renderAdminTable() {
   empty.style.display = 'none';
 
   const dayCounts = {};
-  Object.values(map).forEach(rec => {
+  const currentNamesForCount = new Set(employees);
+  // 従業員リストから削除された人のデータは希望者数のカウントに含めない
+  Object.entries(map).forEach(([name, rec]) => {
+    if (!currentNamesForCount.has(name)) return;
     const combined = new Set([...(rec.offDays || []), ...(rec.adminDays || [])]);
     combined.forEach(d => { dayCounts[d] = (dayCounts[d] || 0) + 1; });
   });
@@ -484,7 +487,10 @@ function exportExcel() {
   const daysInMonth = daysInMonthOf(adminDate);
 
   const dayCounts = {};
-  Object.values(map).forEach(rec => {
+  const currentNamesForCount = new Set(vnEmployees);
+  // 従業員リストから削除された人のデータは希望者数のカウントに含めない
+  Object.entries(map).forEach(([name, rec]) => {
+    if (!currentNamesForCount.has(name)) return;
     const combined = new Set([...(rec.offDays || []), ...(rec.adminDays || [])]);
     combined.forEach(d => { dayCounts[d] = (dayCounts[d] || 0) + 1; });
   });
