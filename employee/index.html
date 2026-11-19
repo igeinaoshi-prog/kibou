@@ -119,9 +119,16 @@ let savedNote = "";
 let empMonthCounts = {};
 let empMonthDocs = [];
 let empCapacityLimits = {};
+let adminCountsInLimit = false;
 let openMonths = new Set();
 let hasSubmittedThisMonth = false;
 const MAX_OFF_DAYS = 5;
+
+// 管理者が追加した休みを上限日数に含める設定のとき、その日数も合算して数える
+function countedDays(offSet, adminSet, includeAdmin) {
+  if (!includeAdmin) return offSet.size;
+  return new Set([...offSet, ...adminSet]).size;
+}
 
 // 名前選択のプルダウンは廃止。URLの ?name=氏名 だけでアクセスする運用にする。
 const urlParams = new URLSearchParams(window.location.search);
@@ -161,14 +168,18 @@ function renderEmployeeDayList() {
   submitBtn.disabled = hasSubmittedThisMonth;
   submitBtn.style.opacity = hasSubmittedThisMonth ? '0.5' : '1';
   submitBtn.style.cursor = hasSubmittedThisMonth ? 'not-allowed' : 'pointer';
-  summary.textContent = `Đã chọn: ${offDaysSet.size}/${MAX_OFF_DAYS} ngày`;
-  summary.style.color = offDaysSet.size >= MAX_OFF_DAYS ? 'var(--full-text)' : 'var(--text-muted)';
+  const usedDays = countedDays(offDaysSet, adminDaysSet, adminCountsInLimit);
+  summary.textContent = `Đã chọn: ${usedDays}/${MAX_OFF_DAYS} ngày`;
+  summary.style.color = usedDays >= MAX_OFF_DAYS ? 'var(--full-text)' : 'var(--text-muted)';
+  legend.textContent = adminCountsInLimit
+    ? `Hãy chọn "×(Muốn nghỉ)" trong danh sách thả xuống của từng ngày. Mỗi tháng chỉ được chọn tối đa ${MAX_OFF_DAYS} ngày. Những ngày đã đủ số lượng sẽ không thể chọn. Những ngày có nhãn "Công ty chỉ định" là do quản lý thêm vào và ĐƯỢC TÍNH vào giới hạn ${MAX_OFF_DAYS} ngày của bạn. Mỗi tháng chỉ được gửi đăng ký 1 lần.`
+    : `Hãy chọn "×(Muốn nghỉ)" trong danh sách thả xuống của từng ngày. Mỗi tháng chỉ được chọn tối đa ${MAX_OFF_DAYS} ngày. Những ngày đã đủ số lượng sẽ không thể chọn. Những ngày có nhãn "Công ty chỉ định" là do quản lý thêm vào và không tính vào giới hạn ${MAX_OFF_DAYS} ngày của bạn. Mỗi tháng chỉ được gửi đăng ký 1 lần.`;
 
   container.innerHTML = "";
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const daysInMonth = daysInMonthOf(currentDate);
-  const personalLimitReached = offDaysSet.size >= MAX_OFF_DAYS;
+  const personalLimitReached = usedDays >= MAX_OFF_DAYS;
 
   for (let day = 1; day <= daysInMonth; day++) {
     const dow = new Date(year, month, day).getDay();
@@ -227,7 +238,8 @@ function renderEmployeeDayList() {
     select.disabled = hasSubmittedThisMonth;
     select.addEventListener('change', (e) => {
       if (e.target.value === 'off') {
-        if (offDaysSet.size >= MAX_OFF_DAYS) {
+        const wouldUse = countedDays(new Set([...offDaysSet, day]), adminDaysSet, adminCountsInLimit);
+        if (wouldUse > MAX_OFF_DAYS) {
           e.target.value = "";
           renderEmployeeDayList();
           return;
@@ -313,6 +325,7 @@ function subscribeEmployeeCapacity() {
   const ym = monthKey(currentDate);
   unsubEmpCapacity = onSnapshot(doc(db, "capacity", ym), snap => {
     empCapacityLimits = snap.exists() ? (snap.data().limits || {}) : {};
+    adminCountsInLimit = snap.exists() && snap.data().adminCountsInLimit === true;
     renderEmployeeDayList();
   }, err => console.error(err));
 }
@@ -378,10 +391,12 @@ async function submitRequest() {
       (data.offDays || []).forEach(day => { freshCounts[day] = (freshCounts[day] || 0) + 1; });
     });
     const limits = capSnap.exists() ? (capSnap.data().limits || {}) : {};
+    const includeAdmin = capSnap.exists() && capSnap.data().adminCountsInLimit === true;
+    const freshAdminSet = new Set(ownSnap.exists() ? (ownSnap.data().adminDays || []) : []);
     const removed = [];
     const finalDays = [];
     Array.from(offDaysSet).sort((a, b) => a - b).forEach(day => {
-      if (finalDays.length >= MAX_OFF_DAYS) { removed.push(day); return; }
+      if (countedDays(new Set([...finalDays, day]), freshAdminSet, includeAdmin) > MAX_OFF_DAYS) { removed.push(day); return; }
       const limit = limits[String(day)];
       const hasLimit = limit !== undefined && limit !== null && limit !== "";
       const other = freshCounts[day] || 0;

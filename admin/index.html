@@ -81,13 +81,20 @@
     <div class="row" style="justify-content:center; margin-bottom:14px;">
       <button id="visibilityToggleBtn" onclick="toggleMonthVisibility()"></button>
     </div>
+    <div class="row" style="justify-content:center; margin-bottom:14px;">
+      <label style="font-size:13px; display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="checkbox" id="adminCountsInLimitChk" onchange="onAdminCountsInLimitChange(this.checked)">
+        この月は、責任者が追加した休みを従業員の上限日数に含める
+      </label>
+    </div>
     <div class="table-scroll">
       <table id="adminTable"><tbody></tbody></table>
     </div>
     <div class="hint">
       「上限設定」の行に、その日に許可する希望休の人数を入力（空欄=上限なし）。「現在の希望者数」が上限に達すると赤く表示され、従業員側では選択できなくなります。<br>
       <span class="legend-swatch" style="background:var(--off-bg);"></span>従業員が選んだ休み(1か月最大5日まで)<br>
-      <span class="legend-swatch" style="background:var(--admin-bg);"></span>責任者が追加した休み(5日の上限とは関係なく、表の日付セルをクリックすると追加/解除できます)<br>
+      <span class="legend-swatch" style="background:var(--admin-bg);"></span>責任者が追加した休み(表の日付セルをクリックすると追加/解除できます。上のチェックで従業員の上限日数に含めるか選べます)<br>
+      赤いセルをクリックすると、その日の従業員の希望だけを個別に取り消せます。<br>
       送信済みの従業員には表の右端に「取消」ボタンが表示され、押すと取り消して再送信できるようになります。
     </div>
     <div id="adminEmpty" class="empty-state" style="display:none;"></div>
@@ -122,6 +129,7 @@ let vnEmployees = [];
 let adminDate = new Date();
 let adminRequestsCache = {};
 let adminCapacityLimits = {};
+let adminCountsInLimit = false;
 let adminOutValues = {};
 let adminStayValues = {};
 let openMonths = new Set();
@@ -170,6 +178,9 @@ function subscribeAdminCapacity() {
     adminCapacityLimits = data.limits || {};
     adminOutValues = data.out || {};
     adminStayValues = data.stay || {};
+    adminCountsInLimit = data.adminCountsInLimit === true;
+    const chk = document.getElementById('adminCountsInLimitChk');
+    if (chk) chk.checked = adminCountsInLimit;
     renderAdminTable();
   }, err => console.error(err));
 }
@@ -213,6 +224,15 @@ async function onQuotaInputChange(day, value) {
 }
 window.onQuotaInputChange = onQuotaInputChange;
 
+async function onAdminCountsInLimitChange(checked) {
+  const ym = monthKey(adminDate);
+  adminCountsInLimit = !!checked;
+  try {
+    await setDoc(doc(db, "capacity", ym), { adminCountsInLimit: !!checked }, { merge: true });
+  } catch (e) { console.error(e); }
+}
+window.onAdminCountsInLimitChange = onAdminCountsInLimitChange;
+
 async function onOutInputChange(day, value) {
   const ym = monthKey(adminDate);
   const updated = { ...adminOutValues };
@@ -237,11 +257,29 @@ async function onStayInputChange(day, value) {
 }
 window.onStayInputChange = onStayInputChange;
 
-// 管理者が表のセルをクリックして、従業員の5日上限とは関係なく休みを追加/解除する
+// 管理者が表のセルをクリックして休みを追加/解除する
+//  ・従業員が選んだ休み(赤)だけのセル → その日の希望だけを個別に取り消す
+//  ・それ以外(空白/紫/赤+紫) → 管理者追加の休みを切り替える
 async function toggleAdminDay(name, day) {
   const ym = monthKey(adminDate);
   const map = adminRequestsCache[ym] || {};
   const rec = map[name] || { offDays: [], adminDays: [], note: "" };
+  const isEmployeeDay = (rec.offDays || []).includes(day);
+  const isAdminDayNow = (rec.adminDays || []).includes(day);
+  if (isEmployeeDay && !isAdminDayNow) {
+    if (!window.confirm(name + " さんの " + day + "日の希望を取り消します。よろしいですか？")) return;
+    try {
+      await setDoc(doc(db, "requests", name + "__" + ym), {
+        employee: name,
+        yearMonth: ym,
+        offDays: (rec.offDays || []).filter(d => d !== day)
+      }, { merge: true });
+    } catch (e) {
+      console.error(e);
+      window.alert("更新に失敗しました。もう一度お試しください。");
+    }
+    return;
+  }
   const adminDaysSet = new Set(rec.adminDays || []);
   if (adminDaysSet.has(day)) adminDaysSet.delete(day);
   else adminDaysSet.add(day);
@@ -336,7 +374,7 @@ function renderAdminTable() {
       if (isOff) cls.push('mark-off');
       if (isAdmin) cls.push('mark-admin');
       const label = (isOff || isAdmin) ? '×' : '';
-      html += `<td class="${cls.join(' ')}" onclick="toggleAdminDay('${safeName}', ${d})" title="クリックで管理者追加の休みを切り替え">${label}</td>`;
+      html += `<td class="${cls.join(' ')}" onclick="toggleAdminDay('${safeName}', ${d})" title="${isOff && !isAdmin ? 'クリックで、この日の従業員の希望だけを取り消し' : 'クリックで管理者追加の休みを切り替え'}">${label}</td>`;
     }
     const totalOffCount = new Set([...(rec.offDays || []), ...(rec.adminDays || [])]).size;
     const countBadge = `<span class="off-count" title="現在の希望休数">${totalOffCount}日</span>`;
